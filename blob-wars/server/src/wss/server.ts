@@ -10,7 +10,7 @@ export interface RunningServer {
   close: () => Promise<void>;
 }
 
-export function startServer(port = getPort()): RunningServer {
+export function startServer(port = getPort(), host = getHost()): RunningServer {
   const lobby = new GlobalLobby();
 
   const server = createServer((request, response) => {
@@ -64,8 +64,8 @@ export function startServer(port = getPort()): RunningServer {
     });
   });
 
-  server.listen(port, () => {
-    console.log(`Blob Wars websocket server listening on http://localhost:${port}`);
+  server.listen(port, host, () => {
+    console.log(`Blob Wars websocket server listening on ${host}:${port}`);
   });
 
   return {
@@ -93,6 +93,10 @@ export function startServer(port = getPort()): RunningServer {
 function getPort(): number {
   const parsedPort = Number.parseInt(process.env.PORT ?? "3002", 10);
   return Number.isNaN(parsedPort) ? 3002 : parsedPort;
+}
+
+function getHost(): string {
+  return process.env.HOST ?? "0.0.0.0";
 }
 
 function normalizeRawMessage(rawMessage: WebSocket.RawData): string {

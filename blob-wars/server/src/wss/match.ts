@@ -26,6 +26,7 @@ export interface AssignedClientConnection extends ClientConnection {
 
 interface Tile {
   owner: PlayerSeat | null;
+  origin: "seed" | "spread" | null;
   plantedTick: number | null;
   lastGrowthTick: number | null;
 }
@@ -168,6 +169,7 @@ export class Match {
       }
 
       tile.owner = action.seat;
+      tile.origin = "seed";
       tile.plantedTick = this.tickNumber;
       tile.lastGrowthTick = this.tickNumber;
     }
@@ -223,6 +225,7 @@ export class Match {
       }
 
       tile.owner = owner;
+      tile.origin = "spread";
       tile.plantedTick = this.tickNumber;
       tile.lastGrowthTick = this.tickNumber;
     }
@@ -316,6 +319,7 @@ function createBoard(): Tile[][] {
   return Array.from({ length: GRID_HEIGHT }, () =>
     Array.from({ length: GRID_WIDTH }, () => ({
       owner: null,
+      origin: null,
       plantedTick: null,
       lastGrowthTick: null,
     })),

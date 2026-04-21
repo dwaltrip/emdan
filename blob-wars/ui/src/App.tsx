@@ -12,7 +12,8 @@ import {
 } from "../../shared/protocol.ts";
 import "./App.css";
 
-const DEFAULT_WS_URL = import.meta.env.VITE_WS_URL ?? "ws://localhost:3002";
+const DEFAULT_WS_PORT = import.meta.env.VITE_WS_PORT ?? "3002";
+const DEFAULT_WS_URL = import.meta.env.VITE_WS_URL ?? getDefaultWsUrl(DEFAULT_WS_PORT);
 
 type ConnectionStatus = "disconnected" | "connecting" | "connected";
 
@@ -242,6 +243,17 @@ function App() {
                 <span>Player 2 tiles: {latestSnapshot.players.player2.occupiedTiles}</span>
               </div>
 
+              <div className="board-legend" aria-label="Board legend">
+                <span className="legend-item">
+                  <span className="legend-swatch legend-seed" aria-hidden="true" />
+                  Original seed
+                </span>
+                <span className="legend-item">
+                  <span className="legend-swatch legend-spread" aria-hidden="true" />
+                  Spread blob
+                </span>
+              </div>
+
               <div
                 className="board"
                 style={{
@@ -250,10 +262,22 @@ function App() {
               >
                 {latestSnapshot.board.tiles.flatMap((row, y) =>
                   row.map((tile, x) => (
-                    <div
-                      key={`${x}-${y}-${tile.owner ?? "empty"}`}
-                      className={`tile tile-${tile.owner ?? "empty"}`}
-                      title={`(${x}, ${y}) ${tile.owner ?? "empty"}`}
+                    <button
+                      key={`${x}-${y}`}
+                      type="button"
+                      className={`tile tile-${tile.owner ?? "empty"} tile-origin-${tile.origin ?? "empty"}`}
+                      title={
+                        tile.owner === null
+                          ? `Plant at (${x}, ${y})`
+                          : `(${x}, ${y}) ${tile.owner} ${describeTileOrigin(tile.origin)}`
+                      }
+                      aria-label={
+                        tile.owner === null
+                          ? `Plant seed at ${x}, ${y}`
+                          : `Tile ${x}, ${y} owned by ${tile.owner}, ${describeTileOrigin(tile.origin)}`
+                      }
+                      disabled={tile.owner !== null || status !== "connected"}
+                      onClick={() => plantSeed(x, y)}
                     />
                   )),
                 )}
@@ -286,6 +310,19 @@ function App() {
 
 function randomCoordinate(size: number): number {
   return Math.floor(Math.random() * size);
+}
+
+function describeTileOrigin(origin: MatchSnapshot["board"]["tiles"][number][number]["origin"]): string {
+  return origin === "seed" ? "seed" : "spread";
+}
+
+function getDefaultWsUrl(port: string): string {
+  if (typeof window === "undefined") {
+    return `ws://localhost:${port}`;
+  }
+
+  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  return `${protocol}//${window.location.hostname}:${port}`;
 }
 
 export default App;
