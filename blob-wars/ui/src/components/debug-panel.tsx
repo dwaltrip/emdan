@@ -1,12 +1,20 @@
 import type { ServerMessage } from "../../../shared/protocol.ts";
 import type { LogEntry } from "../use-game-socket";
 
+const DEBUG_ENABLED =
+  typeof window !== "undefined" &&
+  new URLSearchParams(window.location.search).get("DEBUG") === "1";
+
 interface DebugPanelProps {
   latestMessage: ServerMessage | null;
   logs: LogEntry[];
 }
 
 export function DebugPanel({ latestMessage, logs }: DebugPanelProps) {
+  if (!DEBUG_ENABLED) {
+    return null;
+  }
+
   return (
     <details className="debug-panel">
       <summary>Debug</summary>
