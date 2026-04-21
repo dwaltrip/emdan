@@ -1,21 +1,22 @@
 import type { TileTerrain } from "../../../shared/protocol.ts";
 
-const INITIAL_WALL_CHANCE = 0.42;
+const INITIAL_WALL_CHANCE = 0.45;
 const CA_PASSES = 4;
-const CA_WALL_THRESHOLD = 5;
+const CA_BIRTH_THRESHOLD = 5;
+const CA_SURVIVAL_THRESHOLD = 4;
 const SPAWN_CLEAR_RADIUS = 2;
 
 type TerrainGrid = TileTerrain[][];
 
 export function generateTerrain(width: number, height: number): TerrainGrid {
   const halfWidth = Math.ceil(width / 2);
-  let half = randomFill(halfWidth, height);
+  const half = randomFill(halfWidth, height);
+  let grid = mirrorHorizontally(half, width, height);
 
   for (let i = 0; i < CA_PASSES; i += 1) {
-    half = caStep(half, halfWidth, height);
+    grid = caStep(grid, width, height);
   }
 
-  const grid = mirrorHorizontally(half, width, height);
   clearSpawnCorners(grid, width, height);
   removeIsolatedPockets(grid, width, height);
 
@@ -39,7 +40,10 @@ function caStep(grid: TerrainGrid, width: number, height: number): TerrainGrid {
   for (let y = 0; y < height; y += 1) {
     const row: TileTerrain[] = [];
     for (let x = 0; x < width; x += 1) {
-      row.push(countWallNeighbors(grid, x, y, width, height) >= CA_WALL_THRESHOLD ? "wall" : "blank");
+      const walls = countWallNeighbors(grid, x, y, width, height);
+      const wasWall = grid[y]![x] === "wall";
+      const isWall = walls >= CA_BIRTH_THRESHOLD || (wasWall && walls >= CA_SURVIVAL_THRESHOLD);
+      row.push(isWall ? "wall" : "blank");
     }
     next.push(row);
   }
@@ -53,10 +57,7 @@ function countWallNeighbors(grid: TerrainGrid, x: number, y: number, width: numb
       if (dx === 0 && dy === 0) continue;
       const nx = x + dx;
       const ny = y + dy;
-      if (nx < 0 || nx >= width || ny < 0 || ny >= height) {
-        count += 1;
-        continue;
-      }
+      if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue;
       if (grid[ny]![nx] === "wall") count += 1;
     }
   }
