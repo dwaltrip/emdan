@@ -2,12 +2,6 @@
   padding: 32px;
 }
 
-.grid-layout {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-}
-
 .panel {
   border: 1px solid var(--border);
   border-radius: 18px;
@@ -41,10 +35,6 @@
   margin-bottom: 16px;
 }
 
-.panel-wide {
-  grid-column: 1 / -1;
-}
-
 .eyebrow {
   margin: 0 0 12px;
   color: var(--accent);
@@ -60,8 +50,7 @@
 
 .status-row,
 .button-row,
-.snapshot-summary,
-.custom-seed {
+.snapshot-summary {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
@@ -141,59 +130,10 @@ button:disabled {
   opacity: 0.45;
 }
 
-.button-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  margin: 14px 0;
-}
-
-.custom-seed {
-  align-items: end;
-}
-
-.custom-seed .field {
-  flex: 0 0 90px;
-  margin: 0;
-}
-
 .board {
   display: grid;
   gap: 1px;
   margin-top: 16px;
-}
-
-.board-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 16px;
-}
-
-.legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--text-soft);
-  font-size: 14px;
-}
-
-.legend-swatch {
-  width: 14px;
-  height: 14px;
-  border-radius: 4px;
-}
-
-.legend-seed {
-  background:
-    radial-gradient(circle at center, rgba(255, 255, 255, 0.9) 0 22%, transparent 23%),
-    linear-gradient(135deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0)),
-    #8b5cf6;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3);
-}
-
-.legend-spread {
-  background: #8b5cf6;
 }
 
 .tile {
@@ -295,13 +235,5 @@ button:disabled {
 @media (max-width: 900px) {
   .app-shell {
     padding: 16px;
-  }
-
-  .grid-layout {
-    grid-template-columns: 1fr;
-  }
-
-  .button-grid {
-    grid-template-columns: 1fr;
   }
 }
