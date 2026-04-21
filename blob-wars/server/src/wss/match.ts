@@ -11,8 +11,8 @@ import {
   type MatchWinner,
   type PlayerSeat,
   type ServerMessage,
-  serializeMessage,
-} from "./protocol.ts";
+  serializeServerMessage,
+} from "../../../shared/protocol.ts";
 
 export interface ClientConnection {
   id: string;
@@ -288,7 +288,7 @@ export class Match {
       return;
     }
 
-    player.socket.send(serializeMessage(message));
+    player.socket.send(serializeServerMessage(message));
   }
 
   private sendError(player: AssignedClientConnection, code: string, message: string): void {

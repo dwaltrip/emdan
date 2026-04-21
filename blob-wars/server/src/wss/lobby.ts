@@ -1,7 +1,11 @@
 import WebSocket from "ws";
 
 import { Match, type AssignedClientConnection, type ClientConnection } from "./match.ts";
-import { type ClientMessage, serializeMessage } from "./protocol.ts";
+import {
+  type ClientMessage,
+  type ServerMessage,
+  serializeServerMessage,
+} from "../../../shared/protocol.ts";
 
 export class GlobalLobby {
   private readonly clients = new Map<string, ClientConnection>();
@@ -132,12 +136,12 @@ export class GlobalLobby {
     this.broadcastLobbyUpdate();
   }
 
-  private send(client: ClientConnection, message: Parameters<typeof serializeMessage>[0]): void {
+  private send(client: ClientConnection, message: ServerMessage): void {
     if (client.socket.readyState !== WebSocket.OPEN) {
       return;
     }
 
-    client.socket.send(serializeMessage(message));
+    client.socket.send(serializeServerMessage(message));
   }
 
   private sendError(client: ClientConnection, code: string, message: string): void {

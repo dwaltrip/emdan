@@ -43,5 +43,6 @@
 
     "noEmit": true,
     "allowImportingTsExtensions": true
-  }
+  },
+  "include": ["src", "../shared/**/*.ts"]
 }

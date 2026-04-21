@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import WebSocket, { WebSocketServer } from "ws";
 
 import { GlobalLobby } from "./lobby.ts";
-import { parseClientMessage, serializeMessage } from "./protocol.ts";
+import { parseClientMessage, serializeServerMessage } from "../../../shared/protocol.ts";
 
 export interface RunningServer {
   close: () => Promise<void>;
@@ -46,7 +46,7 @@ export function startServer(port = getPort()): RunningServer {
       if (!parsedMessage) {
         if (socket.readyState === WebSocket.OPEN) {
           socket.send(
-            serializeMessage({
+            serializeServerMessage({
               type: "error",
               code: "invalid_message",
               message: "Could not parse the websocket payload.",
