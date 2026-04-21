@@ -5,9 +5,9 @@ import {
   GRID_WIDTH,
 } from "../../shared/protocol.ts";
 import "./App.css";
-import { Board } from "./board.tsx";
+import { Board } from "./components/board.tsx";
 import { createActions, createBlobWarsBoardStore } from "./board-store";
-import { DebugPanel } from "./debug-panel.tsx";
+import { DebugPanel } from "./components/debug-panel.tsx";
 import { useGameSocket } from "./use-game-socket";
 
 const DEFAULT_WS_PORT = import.meta.env.VITE_WS_PORT ?? "3002";

@@ -1,5 +1,5 @@
-import type { ServerMessage } from "../../shared/protocol.ts";
-import type { LogEntry } from "./use-game-socket";
+import type { ServerMessage } from "../../../shared/protocol.ts";
+import type { LogEntry } from "../use-game-socket";
 
 interface DebugPanelProps {
   latestMessage: ServerMessage | null;
