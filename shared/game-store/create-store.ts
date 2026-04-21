@@ -59,6 +59,10 @@ function createStore<State, Derived = {}>(config: StoreConfig<State, Derived>) {
     runLifecycle(0);
   }
 
+  // Fire onChange once at init so consumers with caches (e.g., a per-tile
+  // wrapper) are populated before any subscribers attach. Mirrors `reset`.
+  config.onChange?.(getMerged());
+
   return {
     get state() {
       return state;
