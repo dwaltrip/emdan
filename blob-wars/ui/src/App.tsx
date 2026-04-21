@@ -7,6 +7,7 @@ import {
 import "./App.css";
 import { Board } from "./board.tsx";
 import { createActions, createBlobWarsBoardStore } from "./board-store";
+import { DebugPanel } from "./debug-panel.tsx";
 import { useGameSocket } from "./use-game-socket";
 
 const DEFAULT_WS_PORT = import.meta.env.VITE_WS_PORT ?? "3002";
@@ -16,7 +17,9 @@ function App() {
   const {
     status,
     seat,
+    latestMessage,
     latestSnapshot,
+    logs,
     connect,
     disconnect,
     send,
@@ -54,6 +57,14 @@ function App() {
   if (seat !== null) {
     return (
       <main className="app-shell match-shell">
+        {latestSnapshot && (
+          <div className="snapshot-summary">
+            <span>Match: {latestSnapshot.matchId}</span>
+            <span>Tick: {latestSnapshot.tick}</span>
+            <span>Player 1 tiles: {latestSnapshot.players.player1.occupiedTiles}</span>
+            <span>Player 2 tiles: {latestSnapshot.players.player2.occupiedTiles}</span>
+          </div>
+        )}
         <Board
           store={store}
           width={GRID_WIDTH}
@@ -61,6 +72,7 @@ function App() {
           connected={status === "connected"}
           onPlant={plantSeed}
         />
+        <DebugPanel latestMessage={latestMessage} logs={logs} />
       </main>
     );
   }
@@ -105,6 +117,8 @@ function App() {
           </button>
         </div>
       </section>
+
+      <DebugPanel latestMessage={latestMessage} logs={logs} />
     </main>
   );
 }
