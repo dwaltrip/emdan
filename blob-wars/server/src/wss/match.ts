@@ -38,6 +38,15 @@ interface QueuedAction {
   y: number;
 }
 
+interface BlobAnalysis {
+  componentIds: (number | null)[][];
+  componentPower: Map<number, number>;
+}
+
+interface TileClaim {
+  bySeat: Map<PlayerSeat, Set<number>>;
+}
+
 interface MatchOptions {
   onEnded: (players: ClientConnection[]) => void;
 }
@@ -176,13 +185,20 @@ export class Match {
   }
 
   private expandSeeds(): void {
-    const claims = new Map<string, Set<PlayerSeat>>();
+    const blobAnalysis = analyzeBlobs(this.board);
+    const claims = new Map<string, TileClaim>();
 
     for (let y = 0; y < this.board.length; y += 1) {
       for (let x = 0; x < this.board[y]!.length; x += 1) {
         const tile = this.board[y]![x]!;
+        const componentId = blobAnalysis.componentIds[y]?.[x] ?? null;
 
-        if (tile.owner === null || tile.lastGrowthTick === null) {
+        if (tile.owner === null || tile.lastGrowthTick === null || componentId === null) {
+          continue;
+        }
+
+        const componentPower = blobAnalysis.componentPower.get(componentId) ?? 0;
+        if (componentPower <= 0) {
           continue;
         }
 
@@ -194,37 +210,42 @@ export class Match {
 
         for (const [nextX, nextY] of getNeighborCoordinates(x, y)) {
           const target = this.board[nextY]?.[nextX];
-          if (!target || target.owner !== null) {
+          if (!target) {
             continue;
           }
 
           const key = `${nextX},${nextY}`;
-          const owners = claims.get(key) ?? new Set<PlayerSeat>();
-          owners.add(tile.owner);
-          claims.set(key, owners);
+          addClaim(claims, key, tile.owner, componentId);
         }
       }
     }
 
-    for (const [key, owners] of claims) {
-      if (owners.size !== 1) {
-        continue;
-      }
-
+    for (const [key, claim] of claims) {
       const [xText, yText] = key.split(",");
       const x = Number.parseInt(xText ?? "", 10);
       const y = Number.parseInt(yText ?? "", 10);
       const tile = this.board[y]?.[x];
-      if (Number.isNaN(x) || Number.isNaN(y) || !tile || tile.owner !== null) {
+      if (Number.isNaN(x) || Number.isNaN(y) || !tile) {
         continue;
       }
 
-      const [owner] = owners;
-      if (!owner) {
+      const defendingComponentId =
+        tile.owner === null ? null : (blobAnalysis.componentIds[y]?.[x] ?? null);
+      if (tile.owner !== null && defendingComponentId !== null) {
+        addClaim(claims, key, tile.owner, defendingComponentId);
+      }
+
+      const winningSeat = determineClaimWinner(claim, blobAnalysis.componentPower);
+      if (winningSeat === null) {
+        clearTile(tile);
         continue;
       }
 
-      tile.owner = owner;
+      if (tile.owner === winningSeat) {
+        continue;
+      }
+
+      tile.owner = winningSeat;
       tile.origin = "spread";
       tile.plantedTick = this.tickNumber;
       tile.lastGrowthTick = this.tickNumber;
@@ -343,6 +364,108 @@ function countTiles(board: Tile[][]): Record<PlayerSeat, number> {
   return counts;
 }
 
+function addClaim(
+  claims: Map<string, TileClaim>,
+  key: string,
+  seat: PlayerSeat,
+  componentId: number,
+): void {
+  const claim = claims.get(key) ?? { bySeat: new Map<PlayerSeat, Set<number>>() };
+  const componentIds = claim.bySeat.get(seat) ?? new Set<number>();
+  componentIds.add(componentId);
+  claim.bySeat.set(seat, componentIds);
+  claims.set(key, claim);
+}
+
+function analyzeBlobs(board: Tile[][]): BlobAnalysis {
+  const componentIds = board.map((row) => row.map(() => null as number | null));
+  const componentPower = new Map<number, number>();
+  let nextComponentId = 0;
+
+  for (let y = 0; y < board.length; y += 1) {
+    for (let x = 0; x < board[y]!.length; x += 1) {
+      const tile = board[y]![x]!;
+      if (tile.owner === null || componentIds[y]![x] !== null) {
+        continue;
+      }
+
+      const componentId = nextComponentId;
+      nextComponentId += 1;
+
+      let power = 0;
+      const stack: Array<[number, number]> = [[x, y]];
+      componentIds[y]![x] = componentId;
+
+      while (stack.length > 0) {
+        const [currentX, currentY] = stack.pop()!;
+        const currentTile = board[currentY]![currentX]!;
+
+        if (currentTile.origin === "seed") {
+          power += 1;
+        }
+
+        for (const [nextX, nextY] of getNeighborCoordinates(currentX, currentY)) {
+          const neighbor = board[nextY]![nextX]!;
+          if (neighbor.owner !== tile.owner || componentIds[nextY]![nextX] !== null) {
+            continue;
+          }
+
+          componentIds[nextY]![nextX] = componentId;
+          stack.push([nextX, nextY]);
+        }
+      }
+
+      componentPower.set(componentId, power);
+    }
+  }
+
+  return {
+    componentIds,
+    componentPower,
+  };
+}
+
+function determineClaimWinner(
+  claim: TileClaim,
+  componentPower: Map<number, number>,
+): PlayerSeat | null {
+  let winningSeat: PlayerSeat | null = null;
+  let winningPower = -1;
+  let hasTie = false;
+
+  for (const [seat, componentIds] of claim.bySeat) {
+    let totalPower = 0;
+
+    for (const componentId of componentIds) {
+      totalPower += componentPower.get(componentId) ?? 0;
+    }
+
+    if (totalPower > winningPower) {
+      winningSeat = seat;
+      winningPower = totalPower;
+      hasTie = false;
+      continue;
+    }
+
+    if (totalPower === winningPower) {
+      hasTie = true;
+    }
+  }
+
+  if (hasTie) {
+    return null;
+  }
+
+  return winningSeat;
+}
+
+function clearTile(tile: Tile): void {
+  tile.owner = null;
+  tile.origin = null;
+  tile.plantedTick = null;
+  tile.lastGrowthTick = null;
+}
+
 function isBoardFull(board: Tile[][]): boolean {
   return board.every((row) => row.every((tile) => tile.owner !== null));
 }
@@ -367,22 +490,12 @@ function isInsideBoard(x: number, y: number): boolean {
 }
 
 function getNeighborCoordinates(x: number, y: number): Array<[number, number]> {
-  const neighbors: Array<[number, number]> = [];
+  const neighbors: Array<[number, number]> = [
+    [x, y - 1],
+    [x + 1, y],
+    [x, y + 1],
+    [x - 1, y],
+  ];
 
-  for (let dy = -1; dy <= 1; dy += 1) {
-    for (let dx = -1; dx <= 1; dx += 1) {
-      if (dx === 0 && dy === 0) {
-        continue;
-      }
-
-      const nextX = x + dx;
-      const nextY = y + dy;
-
-      if (isInsideBoard(nextX, nextY)) {
-        neighbors.push([nextX, nextY]);
-      }
-    }
-  }
-
-  return neighbors;
+  return neighbors.filter(([nextX, nextY]) => isInsideBoard(nextX, nextY));
 }
