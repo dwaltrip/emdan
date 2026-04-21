@@ -146,7 +146,7 @@ function App() {
           <pre>{latestMessage ? JSON.stringify(latestMessage, null, 2) : "No messages yet."}</pre>
         </section>
 
-        <section className="panel">
+        <section className="panel panel-wide">
           <h2>Match state</h2>
           {latestSnapshot ? (
             <>

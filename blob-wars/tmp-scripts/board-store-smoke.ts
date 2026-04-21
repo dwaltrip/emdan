@@ -11,11 +11,11 @@ import { createActions } from "../ui/src/board-store/actions";
 import { createBlobWarsBoardStore } from "../ui/src/board-store/board-store";
 
 function emptyTile(): TileState {
-  return { owner: null, origin: null, plantedTick: null, lastGrowthTick: null };
+  return { terrain: "blank", owner: null, origin: null, plantedTick: null, lastGrowthTick: null };
 }
 
 function seedTile(owner: "player1" | "player2", tick = 0): TileState {
-  return { owner, origin: "seed", plantedTick: tick, lastGrowthTick: null };
+  return { terrain: "blank", owner, origin: "seed", plantedTick: tick, lastGrowthTick: null };
 }
 
 function snapshotOf(tiles: TileState[][], tick = 0): MatchSnapshot {

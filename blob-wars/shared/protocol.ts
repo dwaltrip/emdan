@@ -1,14 +1,16 @@
-export const GRID_WIDTH = 30;
-export const GRID_HEIGHT = 30;
+export const GRID_WIDTH = 80;
+export const GRID_HEIGHT = 80;
 export const TICK_INTERVAL_MS = 1000;
-export const GROWTH_EVERY_TICKS = 4;
+export const GROWTH_EVERY_TICKS = 2;
 
 export type PlayerSeat = "player1" | "player2";
 export type MatchEndReason = "disconnect" | "boardFull";
 export type MatchWinner = PlayerSeat | "draw";
 export type TileOrigin = "seed" | "spread";
+export type TileTerrain = "blank" | "wall";
 
 export interface TileState {
+  terrain: TileTerrain;
   owner: PlayerSeat | null;
   origin: TileOrigin | null;
   plantedTick: number | null;
@@ -254,11 +256,16 @@ function isTileState(value: unknown): value is TileState {
   }
 
   return (
+    isTileTerrain(value.terrain) &&
     (value.owner === null || isPlayerSeat(value.owner)) &&
     isTileOriginOrNull(value.origin) &&
     isNumberOrNull(value.plantedTick) &&
     isNumberOrNull(value.lastGrowthTick)
   );
+}
+
+function isTileTerrain(value: unknown): value is TileTerrain {
+  return value === "blank" || value === "wall";
 }
 
 function isPlayersRecord(value: unknown): value is Record<PlayerSeat, PlayerState> {

@@ -11,8 +11,10 @@ import {
   type MatchWinner,
   type PlayerSeat,
   type ServerMessage,
+  type TileTerrain,
   serializeServerMessage,
 } from "../../../shared/protocol.ts";
+import { generateTerrain } from "./terrain.ts";
 
 export interface ClientConnection {
   id: string;
@@ -25,6 +27,7 @@ export interface AssignedClientConnection extends ClientConnection {
 }
 
 interface Tile {
+  terrain: TileTerrain;
   owner: PlayerSeat | null;
   origin: "seed" | "spread" | null;
   plantedTick: number | null;
@@ -172,6 +175,11 @@ export class Match {
         continue;
       }
 
+      if (tile.terrain === "wall") {
+        this.sendError(player, "tile_impassable", "That tile is impassable.");
+        continue;
+      }
+
       if (tile.owner !== null) {
         this.sendError(player, "tile_occupied", "That tile is already occupied.");
         continue;
@@ -210,7 +218,7 @@ export class Match {
 
         for (const [nextX, nextY] of getNeighborCoordinates(x, y)) {
           const target = this.board[nextY]?.[nextX];
-          if (!target) {
+          if (!target || target.terrain === "wall") {
             continue;
           }
 
@@ -337,8 +345,10 @@ export class Match {
 }
 
 function createBoard(): Tile[][] {
-  return Array.from({ length: GRID_HEIGHT }, () =>
-    Array.from({ length: GRID_WIDTH }, () => ({
+  const terrain = generateTerrain(GRID_WIDTH, GRID_HEIGHT);
+  return terrain.map((row) =>
+    row.map((cell) => ({
+      terrain: cell,
       owner: null,
       origin: null,
       plantedTick: null,
@@ -467,7 +477,7 @@ function clearTile(tile: Tile): void {
 }
 
 function isBoardFull(board: Tile[][]): boolean {
-  return board.every((row) => row.every((tile) => tile.owner !== null));
+  return board.every((row) => row.every((tile) => tile.terrain === "wall" || tile.owner !== null));
 }
 
 function determineWinner(snapshot: MatchSnapshot): MatchWinner {

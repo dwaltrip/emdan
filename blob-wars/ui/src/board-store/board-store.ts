@@ -34,7 +34,7 @@ function createEmptyTiles(width: number, height: number): TileSource[][] {
   for (let y = 0; y < height; y++) {
     const row: TileSource[] = [];
     for (let x = 0; x < width; x++) {
-      row.push({ owner: null, origin: null, plantedTick: null, lastGrowthTick: null });
+      row.push({ terrain: 'blank', owner: null, origin: null, plantedTick: null, lastGrowthTick: null });
     }
     tiles.push(row);
   }
@@ -72,6 +72,7 @@ function createDefaultInputState(width: number, height: number): BlobWarsInputSt
 function createDefaultTileData(coord: Coord): TileData {
   return {
     coord,
+    terrain: 'blank',
     owner: null,
     origin: null,
     blobStrength: 0,
@@ -96,17 +97,23 @@ function createBlobWarsBoardStore(width: number, height: number) {
   }
 
   function runPipeline(state: BlobWarsState): void {
+    let changed = 0;
+    let total = 0;
     iterateCoords(state, (coord) => {
+      total++;
       const key = serializeCoord(coord);
       const next = computeTileData(state, coord);
       const prev = tileCache.get(key);
 
       if (!prev || !tilesEqual(prev, next)) {
+        changed++;
         tileCache.set(key, next);
         const subs = tileSubs.get(key);
         if (subs) for (const cb of subs) cb();
       }
     });
+    const paddedChanged = String(changed).padStart(String(total).length, ' ');
+    console.log(`[board-store] tiles re-rendered: ${paddedChanged}/${total} (tick ${state.game.tick})`);
   }
 
   const store = createStore<BlobWarsInputState, DerivedState>({

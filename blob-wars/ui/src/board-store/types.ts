@@ -1,4 +1,4 @@
-import type { PlayerSeat, PlayerState, TileOrigin, TileState } from '../../../shared/protocol';
+import type { PlayerSeat, PlayerState, TileOrigin, TileState, TileTerrain } from '../../../shared/protocol';
 
 type PlayerId = PlayerSeat;
 
@@ -49,6 +49,7 @@ type BlobWarsState = BlobWarsInputState & DerivedState;
 
 interface TileData {
   coord: Coord;
+  terrain: TileTerrain;
   owner: PlayerSeat | null;
   origin: TileOrigin | null;
   blobStrength: number;

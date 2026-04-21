@@ -18,7 +18,7 @@ export function Board({ store, width, height, connected, onPlant }: BoardProps) 
   }
 
   return (
-    <div className="board" style={{ gridTemplateColumns: `repeat(${width}, 1fr)` }}>
+    <div className="board" style={{ gridTemplateColumns: `repeat(${width}, 1fr)` }}>   
       {cells.map(({ x, y }) => (
         <Tile
           key={`${x}-${y}`}
@@ -43,22 +43,28 @@ interface TileProps {
 
 function Tile({ store, x, y, connected, onPlant }: TileProps) {
   const tile = useTileData(store, { x, y });
+  const isWall = tile.terrain === "wall";
   const ownerClass = tile.owner ?? "empty";
   const originClass = tile.origin ?? "empty";
-  const disabled = tile.owner !== null || !connected;
-  const title =
-    tile.owner === null
+  const disabled = isWall || tile.owner !== null || !connected;
+  const title = isWall
+    ? `(${x}, ${y}) impassable`
+    : tile.owner === null
       ? `Plant at (${x}, ${y})`
       : `(${x}, ${y}) ${tile.owner} ${tile.origin ?? "spread"}`;
-  const ariaLabel =
-    tile.owner === null
+  const ariaLabel = isWall
+    ? `Impassable tile at ${x}, ${y}`
+    : tile.owner === null
       ? `Plant seed at ${x}, ${y}`
       : `Tile ${x}, ${y} owned by ${tile.owner}, ${tile.origin ?? "spread"}`;
+  const className = isWall
+    ? "tile tile-wall"
+    : `tile tile-${ownerClass} tile-origin-${originClass}`;
 
   return (
     <button
       type="button"
-      className={`tile tile-${ownerClass} tile-origin-${originClass}`}
+      className={className}
       title={title}
       aria-label={ariaLabel}
       disabled={disabled}

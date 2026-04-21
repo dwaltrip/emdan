@@ -159,7 +159,7 @@ button:disabled {
 
 .board {
   display: grid;
-  gap: 4px;
+  gap: 1px;
   margin-top: 16px;
 }
 
@@ -202,7 +202,7 @@ button:disabled {
   aspect-ratio: 1;
   padding: 0;
   border: 1px solid transparent;
-  border-radius: 4px;
+  border-radius: 1px;
   background: var(--tile-empty);
   cursor: pointer;
 }
@@ -216,6 +216,18 @@ button:disabled {
 .tile:disabled {
   cursor: default;
   opacity: 1;
+}
+
+.tile-wall {
+  background: #1f2937;
+  border-color: #111827;
+  cursor: default;
+}
+
+.tile-wall:hover:not(:disabled),
+.tile-wall:focus-visible:not(:disabled) {
+  border-color: #111827;
+  transform: none;
 }
 
 .tile-player1 {

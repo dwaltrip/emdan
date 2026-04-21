@@ -25,11 +25,12 @@ function computeTileData(state: BlobWarsState, coord: Coord): TileData {
 
   return {
     coord,
+    terrain: tile.terrain,
     owner: tile.owner,
     origin: tile.origin,
     blobStrength,
     growthDirection,
-    isPlaceable: tile.owner === null,
+    isPlaceable: tile.terrain === 'blank' && tile.owner === null,
     isHovered,
   };
 }
