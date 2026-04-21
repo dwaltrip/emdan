@@ -2,6 +2,7 @@ export const GRID_WIDTH = 80;
 export const GRID_HEIGHT = 80;
 export const TICK_INTERVAL_MS = 1000;
 export const GROWTH_EVERY_TICKS = 2;
+export const STARTING_SEEDS = 7;
 
 export type PlayerSeat = "player1" | "player2";
 export type MatchEndReason = "disconnect" | "boardFull";
@@ -26,6 +27,7 @@ export interface BoardState {
 export interface PlayerState {
   connected: boolean;
   occupiedTiles: number;
+  seedsRemaining: number;
 }
 
 export interface MatchSnapshot {
@@ -280,7 +282,8 @@ function isPlayerState(value: unknown): value is PlayerState {
   return (
     isRecord(value) &&
     typeof value.connected === "boolean" &&
-    typeof value.occupiedTiles === "number"
+    typeof value.occupiedTiles === "number" &&
+    typeof value.seedsRemaining === "number"
   );
 }
 

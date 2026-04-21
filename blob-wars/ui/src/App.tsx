@@ -40,6 +40,10 @@ function App() {
   }, [latestSnapshot, actions]);
 
   function plantSeed(x: number, y: number): void {
+    if (seat !== null && latestSnapshot && latestSnapshot.players[seat].seedsRemaining <= 0) {
+      return;
+    }
+
     send({
       type: "plantSeed",
       x,
@@ -63,6 +67,8 @@ function App() {
             <span>Tick: {latestSnapshot.tick}</span>
             <span>Player 1 tiles: {latestSnapshot.players.player1.occupiedTiles}</span>
             <span>Player 2 tiles: {latestSnapshot.players.player2.occupiedTiles}</span>
+            <span>Player 1 seeds: {latestSnapshot.players.player1.seedsRemaining}</span>
+            <span>Player 2 seeds: {latestSnapshot.players.player2.seedsRemaining}</span>
           </div>
         )}
         <Board

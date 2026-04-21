@@ -42,7 +42,7 @@ function createEmptyTiles(width: number, height: number): TileSource[][] {
 }
 
 function createDefaultPlayerState(): PlayerState {
-  return { connected: false, occupiedTiles: 0 };
+  return { connected: false, occupiedTiles: 0, seedsRemaining: 0 };
 }
 
 function createDefaultGameState(width: number, height: number): BlobWarsSourceState {

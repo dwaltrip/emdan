@@ -4,6 +4,7 @@ import {
   GROWTH_EVERY_TICKS,
   GRID_HEIGHT,
   GRID_WIDTH,
+  STARTING_SEEDS,
   TICK_INTERVAL_MS,
   type ClientMessage,
   type MatchEndReason,
@@ -62,6 +63,7 @@ export class Match {
   private readonly board: Tile[][];
   private readonly startedAt = Date.now();
   private readonly queuedActions: QueuedAction[] = [];
+  private readonly seedsRemaining: Record<PlayerSeat, number>;
   private tickNumber = 0;
   private timer: NodeJS.Timeout | null = null;
   private ended = false;
@@ -74,6 +76,10 @@ export class Match {
     };
     this.onEnded = options.onEnded;
     this.board = createBoard();
+    this.seedsRemaining = {
+      player1: STARTING_SEEDS,
+      player2: STARTING_SEEDS,
+    };
   }
 
   start(): void {
@@ -175,6 +181,11 @@ export class Match {
         continue;
       }
 
+      if (this.seedsRemaining[action.seat] <= 0) {
+        this.sendError(player, "no_seeds", "You are out of seeds.");
+        continue;
+      }
+
       if (tile.terrain === "wall") {
         this.sendError(player, "tile_impassable", "That tile is impassable.");
         continue;
@@ -189,6 +200,7 @@ export class Match {
       tile.origin = "seed";
       tile.plantedTick = this.tickNumber;
       tile.lastGrowthTick = this.tickNumber;
+      this.seedsRemaining[action.seat] -= 1;
     }
   }
 
@@ -301,10 +313,12 @@ export class Match {
         player1: {
           connected: this.players.player1.socket.readyState === WebSocket.OPEN,
           occupiedTiles: counts.player1,
+          seedsRemaining: this.seedsRemaining.player1,
         },
         player2: {
           connected: this.players.player2.socket.readyState === WebSocket.OPEN,
           occupiedTiles: counts.player2,
+          seedsRemaining: this.seedsRemaining.player2,
         },
       },
     };
