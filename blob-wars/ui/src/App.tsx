@@ -1,133 +1,34 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 
 import {
   GRID_HEIGHT,
   GRID_WIDTH,
-  type ClientMessage,
   type MatchSnapshot,
-  type PlayerSeat,
-  type ServerMessage,
-  parseServerMessage,
-  serializeClientMessage,
 } from "../../shared/protocol.ts";
 import "./App.css";
+import { useGameSocket } from "./use-game-socket";
 
 const DEFAULT_WS_PORT = import.meta.env.VITE_WS_PORT ?? "3002";
 const DEFAULT_WS_URL = import.meta.env.VITE_WS_URL ?? getDefaultWsUrl(DEFAULT_WS_PORT);
 
-type ConnectionStatus = "disconnected" | "connecting" | "connected";
-
-interface LogEntry {
-  id: number;
-  direction: "system" | "out" | "in";
-  text: string;
-}
-
 function App() {
-  const socketRef = useRef<WebSocket | null>(null);
-  const logIdRef = useRef(0);
+  const {
+    status,
+    seat,
+    latestMessage,
+    latestSnapshot,
+    logs,
+    connect,
+    disconnect,
+    send,
+  } = useGameSocket();
 
   const [wsUrl, setWsUrl] = useState(DEFAULT_WS_URL);
-  const [status, setStatus] = useState<ConnectionStatus>("disconnected");
-  const [seat, setSeat] = useState<PlayerSeat | null>(null);
   const [customX, setCustomX] = useState(Math.floor(GRID_WIDTH / 2));
   const [customY, setCustomY] = useState(Math.floor(GRID_HEIGHT / 2));
-  const [latestMessage, setLatestMessage] = useState<ServerMessage | null>(null);
-  const [latestSnapshot, setLatestSnapshot] = useState<MatchSnapshot | null>(null);
-  const [logs, setLogs] = useState<LogEntry[]>([]);
-
-  useEffect(() => {
-    return () => {
-      socketRef.current?.close();
-      socketRef.current = null;
-    };
-  }, []);
-
-  function appendLog(direction: LogEntry["direction"], text: string): void {
-    const nextEntry: LogEntry = {
-      id: logIdRef.current,
-      direction,
-      text,
-    };
-    logIdRef.current += 1;
-
-    setLogs((current) => [nextEntry, ...current].slice(0, 30));
-  }
-
-  function connect(): void {
-    const activeSocket = socketRef.current;
-    if (activeSocket && activeSocket.readyState !== WebSocket.CLOSED) {
-      return;
-    }
-
-    setStatus("connecting");
-    appendLog("system", `Connecting to ${wsUrl}`);
-
-    const socket = new WebSocket(wsUrl);
-    socketRef.current = socket;
-
-    socket.addEventListener("open", () => {
-      setStatus("connected");
-      appendLog("system", "Socket connected.");
-    });
-
-    socket.addEventListener("close", () => {
-      if (socketRef.current === socket) {
-        socketRef.current = null;
-      }
-
-      setStatus("disconnected");
-      setSeat(null);
-      appendLog("system", "Socket closed.");
-    });
-
-    socket.addEventListener("error", () => {
-      appendLog("system", "Socket error.");
-    });
-
-    socket.addEventListener("message", (event) => {
-      if (typeof event.data !== "string") {
-        appendLog("in", "Received a non-text websocket payload.");
-        return;
-      }
-
-      const parsed = parseServerMessage(event.data);
-      if (!parsed) {
-        appendLog("in", `Unparsed server payload: ${event.data}`);
-        return;
-      }
-
-      setLatestMessage(parsed);
-      if ("state" in parsed) {
-        setLatestSnapshot(parsed.state);
-      }
-
-      if (parsed.type === "welcome" || parsed.type === "matchStarted") {
-        setSeat(parsed.seat);
-      }
-
-      appendLog("in", JSON.stringify(parsed));
-    });
-  }
-
-  function disconnect(): void {
-    socketRef.current?.close();
-  }
-
-  function sendMessage(message: ClientMessage): void {
-    const socket = socketRef.current;
-    if (!socket || socket.readyState !== WebSocket.OPEN) {
-      appendLog("system", "Cannot send a message while disconnected.");
-      return;
-    }
-
-    const payload = serializeClientMessage(message);
-    socket.send(payload);
-    appendLog("out", payload);
-  }
 
   function plantSeed(x: number, y: number): void {
-    sendMessage({
+    send({
       type: "plantSeed",
       x,
       y,
@@ -173,7 +74,7 @@ function App() {
           </label>
 
           <div className="button-row">
-            <button onClick={connect} disabled={status !== "disconnected"}>
+            <button onClick={() => connect(wsUrl)} disabled={status !== "disconnected"}>
               Connect
             </button>
             <button onClick={disconnect} disabled={status === "disconnected"}>
@@ -185,8 +86,8 @@ function App() {
         <section className="panel">
           <h2>Client events</h2>
           <div className="button-row">
-            <button onClick={() => sendMessage({ type: "joinLobby" })}>Emit `joinLobby`</button>
-            <button onClick={() => sendMessage({ type: "ping" })}>Emit `ping`</button>
+            <button onClick={() => send({ type: "joinLobby" })}>Emit `joinLobby`</button>
+            <button onClick={() => send({ type: "ping" })}>Emit `ping`</button>
           </div>
 
           <div className="button-grid">

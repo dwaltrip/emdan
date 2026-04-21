@@ -77,7 +77,7 @@ function createStore<State, Derived = {}>(config: StoreConfig<State, Derived>) {
 }
 
 function warnDerivedKeyCollisions<State, Derived>(state: State, derived: Derived): void {
-  if (process.env.NODE_ENV !== 'production' && derived && typeof derived === 'object') {
+  if (derived && typeof derived === 'object') {
     const stateKeys = Object.keys(state as object);
     const derivedKeys = Object.keys(derived as object);
     for (const key of derivedKeys) {
