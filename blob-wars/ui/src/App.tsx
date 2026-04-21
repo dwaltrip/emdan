@@ -1,11 +1,12 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   GRID_HEIGHT,
   GRID_WIDTH,
-  type MatchSnapshot,
 } from "../../shared/protocol.ts";
 import "./App.css";
+import { Board } from "./board.tsx";
+import { createActions, createBlobWarsBoardStore } from "./board-store";
 import { useGameSocket } from "./use-game-socket";
 
 const DEFAULT_WS_PORT = import.meta.env.VITE_WS_PORT ?? "3002";
@@ -26,6 +27,18 @@ function App() {
   const [wsUrl, setWsUrl] = useState(DEFAULT_WS_URL);
   const [customX, setCustomX] = useState(Math.floor(GRID_WIDTH / 2));
   const [customY, setCustomY] = useState(Math.floor(GRID_HEIGHT / 2));
+
+  const store = useMemo(
+    () => createBlobWarsBoardStore(GRID_WIDTH, GRID_HEIGHT),
+    [],
+  );
+  const actions = useMemo(() => createActions(store), [store]);
+
+  useEffect(() => {
+    if (latestSnapshot) {
+      actions.applySnapshot(latestSnapshot);
+    }
+  }, [latestSnapshot, actions]);
 
   function plantSeed(x: number, y: number): void {
     send({
@@ -155,34 +168,13 @@ function App() {
                 </span>
               </div>
 
-              <div
-                className="board"
-                style={{
-                  gridTemplateColumns: `repeat(${latestSnapshot.board.width}, 1fr)`,
-                }}
-              >
-                {latestSnapshot.board.tiles.flatMap((row, y) =>
-                  row.map((tile, x) => (
-                    <button
-                      key={`${x}-${y}`}
-                      type="button"
-                      className={`tile tile-${tile.owner ?? "empty"} tile-origin-${tile.origin ?? "empty"}`}
-                      title={
-                        tile.owner === null
-                          ? `Plant at (${x}, ${y})`
-                          : `(${x}, ${y}) ${tile.owner} ${describeTileOrigin(tile.origin)}`
-                      }
-                      aria-label={
-                        tile.owner === null
-                          ? `Plant seed at ${x}, ${y}`
-                          : `Tile ${x}, ${y} owned by ${tile.owner}, ${describeTileOrigin(tile.origin)}`
-                      }
-                      disabled={tile.owner !== null || status !== "connected"}
-                      onClick={() => plantSeed(x, y)}
-                    />
-                  )),
-                )}
-              </div>
+              <Board
+                store={store}
+                width={latestSnapshot.board.width}
+                height={latestSnapshot.board.height}
+                connected={status === "connected"}
+                onPlant={plantSeed}
+              />
             </>
           ) : (
             <p className="empty-state">No match snapshot received yet.</p>
@@ -211,10 +203,6 @@ function App() {
 
 function randomCoordinate(size: number): number {
   return Math.floor(Math.random() * size);
-}
-
-function describeTileOrigin(origin: MatchSnapshot["board"]["tiles"][number][number]["origin"]): string {
-  return origin === "seed" ? "seed" : "spread";
 }
 
 function getDefaultWsUrl(port: string): string {

@@ -4,35 +4,19 @@ import type {
   BlobWarsState,
   Coord,
   GrowthDirection,
-  PlacementInput,
-  PlayerId,
   TileData,
-  TileSource,
-  TileType,
 } from './types';
 
 function computeTileData(state: BlobWarsState, coord: Coord): TileData {
-  const { game, ui, blobs, tileToBlobId, ticksUntilPlacementByPlayer } = state;
+  const { game, ui, blobs, tileToBlobId } = state;
   const tile = game.tiles[coord.y][coord.x];
   const key = serializeCoord(coord);
-
-  const ownerPlayerId = tile.ownerPlayerId;
-  const type: TileType = tile.type ?? 'empty';
 
   const blobId = tileToBlobId.get(key);
   const blob = blobId !== undefined ? blobs.get(blobId) : undefined;
   const blobStrength = blob?.seedCount ?? 0;
 
   const growthDirection = computeGrowthDirection(state, coord, blobId);
-
-  const pendingPlacementByPlayerId = findPendingPlacementAt(coord, game.pendingPlacements);
-  const isPendingPlacement = pendingPlacementByPlayerId !== null;
-
-  const isPlaceableForActiveInputPlayer = computeIsPlaceable(
-    tile,
-    ui.activeInputPlayerId,
-    ticksUntilPlacementByPlayer,
-  );
 
   const isHovered =
     ui.hoveredCoord !== null &&
@@ -41,13 +25,11 @@ function computeTileData(state: BlobWarsState, coord: Coord): TileData {
 
   return {
     coord,
-    ownerPlayerId,
-    type,
+    owner: tile.owner,
+    origin: tile.origin,
     blobStrength,
     growthDirection,
-    isPendingPlacement,
-    pendingPlacementByPlayerId,
-    isPlaceableForActiveInputPlayer,
+    isPlaceable: tile.owner === null,
     isHovered,
   };
 }
@@ -70,11 +52,11 @@ function computeGrowthDirection(
 
   for (const neighbor of neighbors) {
     const nTile = state.game.tiles[neighbor.y][neighbor.x];
-    if (nTile.ownerPlayerId === null) {
+    if (nTile.owner === null) {
       touchesEmpty = true;
       continue;
     }
-    if (nTile.ownerPlayerId === blob.ownerPlayerId) continue;
+    if (nTile.owner === blob.owner) continue;
 
     hasEnemy = true;
     const nBlobId = state.tileToBlobId.get(serializeCoord(neighbor));
@@ -89,29 +71,6 @@ function computeGrowthDirection(
     return 'neutral';
   }
   return 'positive';
-}
-
-function findPendingPlacementAt(
-  coord: Coord,
-  pending: Record<PlayerId, PlacementInput>,
-): PlayerId | null {
-  for (const [playerId, input] of Object.entries(pending)) {
-    if (input.type === 'place' && input.coord.x === coord.x && input.coord.y === coord.y) {
-      return playerId;
-    }
-  }
-  return null;
-}
-
-function computeIsPlaceable(
-  tile: TileSource,
-  activeInputPlayerId: PlayerId | null,
-  ticksUntilPlacementByPlayer: Map<PlayerId, number>,
-): boolean {
-  if (activeInputPlayerId === null) return false;
-  if (tile.ownerPlayerId !== null) return false;
-  const ticksUntil = ticksUntilPlacementByPlayer.get(activeInputPlayerId) ?? 0;
-  return ticksUntil === 0;
 }
 
 export { computeTileData };

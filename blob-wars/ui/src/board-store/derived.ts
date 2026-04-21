@@ -6,11 +6,8 @@ import type {
   Coord,
   CoordKey,
   DerivedState,
-  Player,
-  PlayerId,
   TileSource,
 } from './types';
-import { PLACEMENT_COOLDOWN } from './types';
 
 function deriveBlobWarsState(state: BlobWarsInputState): DerivedState {
   const { game } = state;
@@ -21,7 +18,7 @@ function deriveBlobWarsState(state: BlobWarsInputState): DerivedState {
   for (let y = 0; y < game.height; y++) {
     for (let x = 0; x < game.width; x++) {
       const tile = game.tiles[y][x];
-      if (tile.ownerPlayerId === null) continue;
+      if (tile.owner === null) continue;
       const key = serializeCoord({ x, y });
       if (tileToBlobId.has(key)) continue;
 
@@ -38,9 +35,7 @@ function deriveBlobWarsState(state: BlobWarsInputState): DerivedState {
     }
   }
 
-  const ticksUntilPlacementByPlayer = computeCooldowns(game.players, game.tick);
-
-  return { blobs, tileToBlobId, ticksUntilPlacementByPlayer };
+  return { blobs, tileToBlobId };
 }
 
 function floodFillBlob(
@@ -51,7 +46,7 @@ function floodFillBlob(
   height: number,
   tileToBlobId: Map<CoordKey, BlobId>,
 ): Blob {
-  const ownerPlayerId = tiles[start.y][start.x].ownerPlayerId!;
+  const owner = tiles[start.y][start.x].owner!;
   const visited: Coord[] = [];
   const stack: Coord[] = [start];
   let seedCount = 0;
@@ -63,16 +58,16 @@ function floodFillBlob(
     if (tileToBlobId.has(key)) continue;
 
     const tile = tiles[coord.y][coord.x];
-    if (tile.ownerPlayerId !== ownerPlayerId) continue;
+    if (tile.owner !== owner) continue;
 
     tileToBlobId.set(key, id);
     visited.push(coord);
-    if (tile.type === 'seed') seedCount++;
+    if (tile.origin === 'seed') seedCount++;
 
     let isBorder = false;
     for (const neighbor of getNeighbors(coord, width, height)) {
       const neighborTile = tiles[neighbor.y][neighbor.x];
-      if (neighborTile.ownerPlayerId === ownerPlayerId) {
+      if (neighborTile.owner === owner) {
         stack.push(neighbor);
       } else {
         isBorder = true;
@@ -83,25 +78,11 @@ function floodFillBlob(
 
   return {
     id,
-    ownerPlayerId,
+    owner,
     tiles: visited,
     seedCount,
     borderTiles: Array.from(borderSet.values()),
   };
-}
-
-function computeCooldowns(players: Player[], currentTick: number): Map<PlayerId, number> {
-  const result = new Map<PlayerId, number>();
-  for (const player of players) {
-    if (player.lastPlacementTick < 0) {
-      result.set(player.id, 0);
-      continue;
-    }
-    const elapsed = currentTick - player.lastPlacementTick;
-    const remaining = Math.max(0, PLACEMENT_COOLDOWN - elapsed);
-    result.set(player.id, remaining);
-  }
-  return result;
 }
 
 export { deriveBlobWarsState };

@@ -4,13 +4,11 @@ function tilesEqual(a: TileData, b: TileData): boolean {
   return (
     a.coord.x === b.coord.x &&
     a.coord.y === b.coord.y &&
-    a.ownerPlayerId === b.ownerPlayerId &&
-    a.type === b.type &&
+    a.owner === b.owner &&
+    a.origin === b.origin &&
     a.blobStrength === b.blobStrength &&
     a.growthDirection === b.growthDirection &&
-    a.isPendingPlacement === b.isPendingPlacement &&
-    a.pendingPlacementByPlayerId === b.pendingPlacementByPlayerId &&
-    a.isPlaceableForActiveInputPlayer === b.isPlaceableForActiveInputPlayer &&
+    a.isPlaceable === b.isPlaceable &&
     a.isHovered === b.isHovered
   );
 }

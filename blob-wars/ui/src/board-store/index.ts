@@ -8,15 +8,11 @@ export type {
   CoordKey,
   DerivedState,
   GrowthDirection,
-  PlacementInput,
-  Player,
   PlayerId,
   TileData,
   TileSource,
-  TileType,
   UIState,
 } from './types';
-export { PLACEMENT_COOLDOWN } from './types';
 
 export type { BlobWarsBoardStoreInstance } from './board-store';
 export { createBlobWarsBoardStore, createDefaultTileData } from './board-store';

@@ -11,6 +11,7 @@
 // - grid size fixed for the lifetime of a session
 
 import { createStore } from '../../../../shared/game-store/create-store';
+import type { PlayerState } from '../../../shared/protocol';
 
 import { serializeCoord } from './coord';
 import { deriveBlobWarsState } from './derived';
@@ -33,11 +34,15 @@ function createEmptyTiles(width: number, height: number): TileSource[][] {
   for (let y = 0; y < height; y++) {
     const row: TileSource[] = [];
     for (let x = 0; x < width; x++) {
-      row.push({ ownerPlayerId: null, type: null });
+      row.push({ owner: null, origin: null, plantedTick: null, lastGrowthTick: null });
     }
     tiles.push(row);
   }
   return tiles;
+}
+
+function createDefaultPlayerState(): PlayerState {
+  return { connected: false, occupiedTiles: 0 };
 }
 
 function createDefaultGameState(width: number, height: number): BlobWarsSourceState {
@@ -46,15 +51,15 @@ function createDefaultGameState(width: number, height: number): BlobWarsSourceSt
     height,
     tiles: createEmptyTiles(width, height),
     tick: 0,
-    players: [],
-    pendingPlacements: {},
-    status: 'active',
-    winner: null,
+    players: {
+      player1: createDefaultPlayerState(),
+      player2: createDefaultPlayerState(),
+    },
   };
 }
 
 function createDefaultUIState(): UIState {
-  return { hoveredCoord: null, activeInputPlayerId: null };
+  return { hoveredCoord: null };
 }
 
 function createDefaultInputState(width: number, height: number): BlobWarsInputState {
@@ -67,13 +72,11 @@ function createDefaultInputState(width: number, height: number): BlobWarsInputSt
 function createDefaultTileData(coord: Coord): TileData {
   return {
     coord,
-    ownerPlayerId: null,
-    type: 'empty',
+    owner: null,
+    origin: null,
     blobStrength: 0,
     growthDirection: 'none',
-    isPendingPlacement: false,
-    pendingPlacementByPlayerId: null,
-    isPlaceableForActiveInputPlayer: false,
+    isPlaceable: true,
     isHovered: false,
   };
 }

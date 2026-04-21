@@ -1,4 +1,6 @@
-type PlayerId = string;
+import type { PlayerSeat, PlayerState, TileOrigin, TileState } from '../../../shared/protocol';
+
+type PlayerId = PlayerSeat;
 
 type CoordKey = string;
 
@@ -7,35 +9,18 @@ interface Coord {
   y: number;
 }
 
-type TileType = 'empty' | 'seed' | 'grown';
-
-interface TileSource {
-  ownerPlayerId: PlayerId | null;
-  type: 'seed' | 'grown' | null;
-}
-
-interface Player {
-  id: PlayerId;
-  index: number;
-  lastPlacementTick: number;
-}
-
-type PlacementInput = { type: 'place'; coord: Coord } | { type: 'skip' };
+type TileSource = TileState;
 
 interface BlobWarsSourceState {
   width: number;
   height: number;
   tiles: TileSource[][];
   tick: number;
-  players: Player[];
-  pendingPlacements: Record<PlayerId, PlacementInput>;
-  status: 'active' | 'ended';
-  winner: PlayerId | null;
+  players: Record<PlayerSeat, PlayerState>;
 }
 
 interface UIState {
   hoveredCoord: Coord | null;
-  activeInputPlayerId: PlayerId | null;
 }
 
 interface BlobWarsInputState {
@@ -47,7 +32,7 @@ type BlobId = number;
 
 interface Blob {
   id: BlobId;
-  ownerPlayerId: PlayerId;
+  owner: PlayerSeat;
   tiles: Coord[];
   seedCount: number;
   borderTiles: Coord[];
@@ -58,33 +43,25 @@ type GrowthDirection = 'positive' | 'neutral' | 'negative' | 'none';
 interface DerivedState {
   blobs: Map<BlobId, Blob>;
   tileToBlobId: Map<CoordKey, BlobId>;
-  ticksUntilPlacementByPlayer: Map<PlayerId, number>;
 }
 
 type BlobWarsState = BlobWarsInputState & DerivedState;
 
 interface TileData {
   coord: Coord;
-  ownerPlayerId: PlayerId | null;
-  type: TileType;
+  owner: PlayerSeat | null;
+  origin: TileOrigin | null;
   blobStrength: number;
   growthDirection: GrowthDirection;
-  isPendingPlacement: boolean;
-  pendingPlacementByPlayerId: PlayerId | null;
-  isPlaceableForActiveInputPlayer: boolean;
+  isPlaceable: boolean;
   isHovered: boolean;
 }
-
-const PLACEMENT_COOLDOWN = 5;
 
 export type {
   PlayerId,
   CoordKey,
   Coord,
-  TileType,
   TileSource,
-  Player,
-  PlacementInput,
   BlobWarsSourceState,
   UIState,
   BlobWarsInputState,
@@ -95,4 +72,3 @@ export type {
   BlobWarsState,
   TileData,
 };
-export { PLACEMENT_COOLDOWN };
