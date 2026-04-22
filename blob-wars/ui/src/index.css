@@ -10,7 +10,6 @@
   --accent: #c084fc;
   --accent-bg: rgba(192, 132, 252, 0.18);
   --accent-border: rgba(192, 132, 252, 0.42);
-  --tile-empty: rgba(148, 163, 184, 0.18);
   --shadow: 0 18px 45px rgba(15, 23, 42, 0.28);
 
   font-family:
@@ -18,9 +17,7 @@
   line-height: 1.5;
   font-weight: 400;
   color: var(--text);
-  background:
-    radial-gradient(circle at top, rgba(139, 92, 246, 0.18), transparent 32%),
-    linear-gradient(180deg, #111827 0%, #020617 100%);
+  background-color: #111827;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;

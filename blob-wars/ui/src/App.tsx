@@ -88,11 +88,6 @@ function App() {
       <section className="panel hero-panel">
         <div>
           <p className="eyebrow">Blob Wars UI</p>
-          <h1>Websocket event console</h1>
-          <p className="subtitle">
-            The frontend imports the same typed websocket protocol as the Node server, so the
-            message shapes, board dimensions, and parsers stay aligned.
-          </p>
         </div>
 
         <div className="status-row">

@@ -143,7 +143,7 @@ button:disabled {
   padding: 0;
   border: 1px solid transparent;
   border-radius: 1px;
-  background: var(--tile-empty);
+  background: rgba(148, 163, 184, 0.18);
   cursor: pointer;
 }
 
@@ -171,23 +171,20 @@ button:disabled {
 }
 
 .tile-player1 {
-  --tile-color: #8b5cf6;
-  background: #8b5cf6;
+  --tile-color: #613fb0;
+  background: #613fb0;
 }
 
 .tile-player2 {
-  --tile-color: #22c55e;
-  background: #22c55e;
+  --tile-color: #226e3e;
+  background: #226e3e;
 }
 
 .tile-origin-seed {
   background:
-    radial-gradient(circle at center, rgba(255, 255, 255, 0.92) 0 20%, transparent 21%),
+    radial-gradient(circle at center, rgba(255, 255, 255, 0.92) 0 30%, transparent 21%),
     linear-gradient(135deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0)),
     var(--tile-color);
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.35),
-    0 0 0 1px color-mix(in srgb, var(--tile-color) 75%, white);
 }
 
 .tile-origin-spread {
