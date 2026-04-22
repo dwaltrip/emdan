@@ -1,0 +1,60 @@
+.board {
+  display: grid;
+  gap: 1px;
+  margin-top: 16px;
+}
+
+.tile {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 1px;
+  background: rgba(148, 163, 184, 0.18);
+  cursor: pointer;
+}
+
+.tile:hover:not(:disabled),
+.tile:focus-visible:not(:disabled) {
+  border-color: var(--accent-border);
+  transform: none;
+}
+
+.tile:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.tile-wall {
+  background: #1f2937;
+  border-color: #111827;
+  cursor: default;
+}
+
+.tile-wall:hover:not(:disabled),
+.tile-wall:focus-visible:not(:disabled) {
+  border-color: #111827;
+  transform: none;
+}
+
+.tile-player1 {
+  --tile-color: #613fb0;
+  background: #613fb0;
+}
+
+.tile-player2 {
+  --tile-color: #226e3e;
+  background: #226e3e;
+}
+
+.tile-origin-seed {
+  background:
+    radial-gradient(circle at center, rgba(255, 255, 255, 0.92) 0 30%, transparent 21%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0)),
+    var(--tile-color);
+}
+
+.tile-origin-spread {
+  background: var(--tile-color);
+}
