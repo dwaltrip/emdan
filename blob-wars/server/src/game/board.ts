@@ -70,6 +70,21 @@ export function getNeighborCoordinates(x: number, y: number): Array<[number, num
   return neighbors.filter(([nextX, nextY]) => isInsideBoard(nextX, nextY));
 }
 
+export function getAllEightNeighbors(x: number, y: number): Array<[number, number]> {
+  const neighbors: Array<[number, number]> = [
+    [x, y - 1],
+    [x + 1, y - 1],
+    [x + 1, y],
+    [x + 1, y + 1],
+    [x, y + 1],
+    [x - 1, y + 1],
+    [x - 1, y],
+    [x - 1, y - 1],
+  ];
+
+  return neighbors.filter(([nextX, nextY]) => isInsideBoard(nextX, nextY));
+}
+
 export function otherSeat(seat: PlayerSeat): PlayerSeat {
   return seat === "player1" ? "player2" : "player1";
 }

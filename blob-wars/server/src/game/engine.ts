@@ -13,6 +13,7 @@ import {
   clearTile,
   countTiles,
   createBoard,
+  getAllEightNeighbors,
   getNeighborCoordinates,
   isBoardFull,
   isInsideBoard,
@@ -174,6 +175,13 @@ export class GameEngine {
     const blobAnalysis = analyzeBlobs(this.board);
     const claims = new Map<string, TileClaim>();
 
+    // Diagonals fire 2 of every 3 growth steps → rate ≈ 0.67, close to 1/√2 (Euclidean).
+    const growthStep = Math.floor(this.tickNumber / GROWTH_EVERY_TICKS);
+    // const includeDiagonals = growthStep % 3 !== 0;
+    // const includeDiagonals = growthStep % 7 < 5;
+    const includeDiagonals = growthStep % 2 !== 0;
+    const neighborsOf = includeDiagonals ? getAllEightNeighbors : getNeighborCoordinates;
+
     for (let y = 0; y < this.board.length; y += 1) {
       for (let x = 0; x < this.board[y]!.length; x += 1) {
         const tile = this.board[y]![x]!;
@@ -194,7 +202,7 @@ export class GameEngine {
 
         tile.lastGrowthTick = this.tickNumber;
 
-        for (const [nextX, nextY] of getNeighborCoordinates(x, y)) {
+        for (const [nextX, nextY] of neighborsOf(x, y)) {
           const target = this.board[nextY]?.[nextX];
           if (!target || target.terrain === "wall") {
             continue;
