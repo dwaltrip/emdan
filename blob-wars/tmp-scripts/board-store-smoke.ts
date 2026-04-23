@@ -27,8 +27,8 @@ function snapshotOf(tiles: TileState[][], tick = 0): MatchSnapshot {
     growthEveryTicks: 10,
     board: { width: tiles[0].length, height: tiles.length, tiles },
     players: {
-      player1: { connected: true, occupiedTiles: 0 },
-      player2: { connected: true, occupiedTiles: 0 },
+      player1: { connected: true, occupiedTiles: 0, seedsRemaining: 0 },
+      player2: { connected: true, occupiedTiles: 0, seedsRemaining: 0 },
     },
   };
 }
