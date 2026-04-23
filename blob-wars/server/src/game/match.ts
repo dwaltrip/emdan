@@ -22,7 +22,6 @@ import {
   type Tile,
 } from "./board.ts";
 import { addClaim, analyzeBlobs, determineClaimWinner, type TileClaim } from "./blob.ts";
-import type { MatchTransport } from "./transport.ts";
 
 interface QueuedAction {
   clientId: string;
@@ -33,7 +32,8 @@ interface QueuedAction {
 
 interface MatchOptions {
   clientIds: Record<PlayerSeat, string>;
-  transport: MatchTransport;
+  send: (seat: PlayerSeat, message: ServerMessage) => void;
+  isConnected: (seat: PlayerSeat) => boolean;
   onEnded: () => void;
 }
 
@@ -41,7 +41,8 @@ export class Match {
   readonly id: string;
 
   private readonly clientIds: Record<PlayerSeat, string>;
-  private readonly transport: MatchTransport;
+  private readonly send: MatchOptions["send"];
+  private readonly isConnected: MatchOptions["isConnected"];
   private readonly onEnded: MatchOptions["onEnded"];
   private readonly board: Tile[][];
   private readonly startedAt = Date.now();
@@ -54,7 +55,8 @@ export class Match {
   constructor(options: MatchOptions) {
     this.id = `match-${Date.now()}`;
     this.clientIds = options.clientIds;
-    this.transport = options.transport;
+    this.send = options.send;
+    this.isConnected = options.isConnected;
     this.onEnded = options.onEnded;
     this.board = createBoard();
     this.seedsRemaining = {
@@ -292,12 +294,12 @@ export class Match {
       },
       players: {
         player1: {
-          connected: this.transport.isConnected("player1"),
+          connected: this.isConnected("player1"),
           occupiedTiles: counts.player1,
           seedsRemaining: this.seedsRemaining.player1,
         },
         player2: {
-          connected: this.transport.isConnected("player2"),
+          connected: this.isConnected("player2"),
           occupiedTiles: counts.player2,
           seedsRemaining: this.seedsRemaining.player2,
         },
@@ -306,12 +308,12 @@ export class Match {
   }
 
   private sendToAll(message: ServerMessage | ((seat: PlayerSeat) => ServerMessage)): void {
-    this.transport.send("player1", typeof message === "function" ? message("player1") : message);
-    this.transport.send("player2", typeof message === "function" ? message("player2") : message);
+    this.send("player1", typeof message === "function" ? message("player1") : message);
+    this.send("player2", typeof message === "function" ? message("player2") : message);
   }
 
   private sendError(seat: PlayerSeat, code: string, message: string): void {
-    this.transport.send(seat, {
+    this.send(seat, {
       type: "error",
       code,
       message,
