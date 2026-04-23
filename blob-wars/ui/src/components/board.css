@@ -4,6 +4,16 @@
   margin-top: 16px;
 }
 
+.board-seat-player1 {
+  --tile-hover-color: #b89cff;
+  --tile-hover-glow: rgba(184, 156, 255, 0.45);
+}
+
+.board-seat-player2 {
+  --tile-hover-color: #6fd095;
+  --tile-hover-glow: rgba(111, 208, 149, 0.45);
+}
+
 .tile {
   position: relative;
   width: 100%;
@@ -16,7 +26,8 @@
 }
 
 .tile:hover:not(.tile-disabled) {
-  border-color: var(--accent-border);
+  border-color: var(--tile-hover-color, var(--accent-border));
+  box-shadow: inset 0 0 0 9999px var(--tile-hover-glow, transparent);
 }
 
 .tile-disabled {
@@ -30,7 +41,21 @@
 }
 
 .tile-in-exclusion-zone {
-  background: rgba(160, 60, 60, 0.45);
+  background:
+    linear-gradient(var(--exclusion-tint), var(--exclusion-tint)),
+    rgba(71, 75, 81, 0.59);
+}
+
+.tile-in-exclusion-zone-player1 {
+  --exclusion-tint: rgba(97, 63, 176, 0.28);
+}
+
+.tile-in-exclusion-zone-player2 {
+  --exclusion-tint: rgba(34, 110, 62, 0.32);
+}
+
+.tile-in-exclusion-zone-both {
+  --exclusion-tint: rgba(140, 140, 160, 0.24);
 }
 
 .tile-player1 {
