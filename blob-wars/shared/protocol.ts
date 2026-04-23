@@ -125,11 +125,11 @@ export function parseClientMessage(raw: string): ClientMessage | null {
     case "ping":
       return { type: "ping" };
     case "plantSeed":
-      if (typeof parsed.x !== "number" || typeof parsed.y !== "number") {
+      if (!Number.isInteger(parsed.x) || !Number.isInteger(parsed.y)) {
         return null;
       }
 
-      return { type: "plantSeed", x: parsed.x, y: parsed.y };
+      return { type: "plantSeed", x: parsed.x as number, y: parsed.y as number };
     default:
       return null;
   }
