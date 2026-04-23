@@ -9,6 +9,8 @@ import {
   serializeClientMessage,
 } from "@shared/protocol";
 
+import { perfLog } from "@/lib/perf-log";
+
 export type ConnectionStatus = "disconnected" | "connecting" | "connected";
 
 export interface LogEntry {
@@ -85,6 +87,7 @@ export function useGameSocket(url: string) {
 
       setLatestMessage(parsed);
       if ("state" in parsed) {
+        perfLog.event("wsRecv", parsed.state.tick);
         setLatestSnapshot(parsed.state);
       }
 

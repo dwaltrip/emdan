@@ -11,6 +11,7 @@
 // - grid size fixed for the lifetime of a session
 
 import { createStore } from '@/lib/create-store';
+import { perfLog } from '@/lib/perf-log';
 import type { PlayerState } from '@shared/protocol';
 
 import { serializeCoord } from './coord';
@@ -97,7 +98,7 @@ function createBlobWarsBoardStore(width: number, height: number) {
     }
   }
 
-  function runPipeline(state: BlobWarsState): void {
+  function runPipeline(state: BlobWarsState): { changed: number; total: number; newlyOccupied: number } {
     let changed = 0;
     let total = 0;
     let newlyOccupied = 0;
@@ -117,16 +118,22 @@ function createBlobWarsBoardStore(width: number, height: number) {
         if (subs) for (const cb of subs) cb();
       }
     });
-    const paddedChanged = String(changed).padStart(String(total).length, ' ');
-    console.log(
-      `[board-store] tiles re-rendered: ${paddedChanged}/${total} (tick ${state.game.tick}, newly occupied: ${newlyOccupied})`,
-    );
+    return { changed, total, newlyOccupied };
   }
 
   const store = createStore<BlobWarsInputState, DerivedState>({
     initialState: createDefaultInputState(width, height),
-    derive: deriveBlobWarsState,
-    onChange: runPipeline,
+    derive: (state) => {
+      const tick = state.game.tick;
+      perfLog.event('pipeStart', tick);
+      return perfLog.timed('derive', tick, () => deriveBlobWarsState(state));
+    },
+    onChange: (merged) => {
+      const tick = merged.game.tick;
+      const stats = perfLog.timed('diff', tick, () => runPipeline(merged));
+      perfLog.event('pipeEnd', tick, stats);
+      perfLog.rAFEvent('paint', tick);
+    },
   });
 
   return {

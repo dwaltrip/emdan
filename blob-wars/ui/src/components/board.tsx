@@ -2,6 +2,7 @@ import clsx from "clsx";
 
 import type { BlobWarsBoardStoreInstance } from "@/board-store";
 import { useTileData } from "@/board-store";
+import { perfLog } from "@/lib/perf-log";
 import type { PlayerSeat } from "@shared/protocol";
 import "./board.css";
 
@@ -50,6 +51,7 @@ interface TileProps {
 }
 
 function Tile({ store, x, y, canPlant, onPlant }: TileProps) {
+  perfLog.bumpTileRender();
   const tile = useTileData(store, { x, y });
   const isWall = tile.terrain === "wall";
   const ownerClass = tile.owner ?? "empty";
