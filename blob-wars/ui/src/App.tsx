@@ -47,50 +47,61 @@ function App() {
     });
   }
 
-  const statusLabel =
+  if (seat !== null) {
+    return (
+      <>
+        <main className="app-shell match-shell">
+          {latestSnapshot && <MatchDetails snapshot={latestSnapshot} seat={seat} />}
+          <Board
+            store={store}
+            width={GRID_WIDTH}
+            height={GRID_HEIGHT}
+            connected={status === "connected"}
+            onPlant={plantSeed}
+          />
+          <DebugPanel latestMessage={latestMessage} logs={logs} />
+        </main>
+        <StatusBar status={status} />
+      </>
+    );
+  }
+
+  return (
+    <>
+      <main className="app-shell app-shell-pre-match">
+        <section className="hero-panel">
+          <h1 className="hero-title">Blob Wars</h1>
+          {status === "connected" && (
+            <button onClick={() => send({ type: "joinLobby" })}>
+              Join lobby
+            </button>
+          )}
+        </section>
+
+        <DebugPanel latestMessage={latestMessage} logs={logs} />
+      </main>
+      <StatusBar status={status} />
+    </>
+  );
+}
+
+interface StatusBarProps {
+  status: "connected" | "connecting" | "disconnected";
+}
+
+function StatusBar({ status }: StatusBarProps) {
+  const label =
     status === "connected"
       ? "Connected"
       : status === "connecting"
         ? "Connecting"
         : "Disconnected";
 
-  if (seat !== null) {
-    return (
-      <main className="app-shell match-shell">
-        {latestSnapshot && <MatchDetails snapshot={latestSnapshot} seat={seat} />}
-        <Board
-          store={store}
-          width={GRID_WIDTH}
-          height={GRID_HEIGHT}
-          connected={status === "connected"}
-          onPlant={plantSeed}
-        />
-        <DebugPanel latestMessage={latestMessage} logs={logs} />
-      </main>
-    );
-  }
-
   return (
-    <main className="app-shell">
-      <section className="panel hero-panel">
-        <h1 className="hero-title">Blob Wars</h1>
-        <div className="status-row">
-          <span className={`status-pill status-${status}`}>{statusLabel}</span>
-        </div>
-        {status === "connected" && (
-          <button
-            onClick={() => send({ type: "joinLobby" })}
-            className="join-lobby-button"
-          >
-            Join lobby
-          </button>
-        )}
-        {status === "connecting" && <p className="hero-hint">Connecting…</p>}
-        {status === "disconnected" && <p className="hero-hint">Lost connection. Refresh to retry.</p>}
-      </section>
-
-      <DebugPanel latestMessage={latestMessage} logs={logs} />
-    </main>
+    <div className={`status-bar status-bar-${status}`}>
+      <span className="status-bar-dot" />
+      <span>{label}</span>
+    </div>
   );
 }
 
@@ -134,15 +145,11 @@ interface PlayerCardProps {
 function PlayerCard({ label, tiles, seeds, isYou }: PlayerCardProps) {
   return (
     <div className={`player-card${isYou ? " player-card-you" : ""}`}>
-      <div className="player-card-header">
-        <span className="player-card-label">{label}</span>
-        {isYou && <span className="player-card-you-badge">You</span>}
-      </div>
-      <div className="player-card-stats">
-        <span>{tiles} tiles</span>
-        <span>·</span>
-        <span>{seeds} seeds</span>
-      </div>
+      <span className="player-card-label">{label}</span>
+      {isYou && <span className="player-card-you-badge">You</span>}
+      <span className="player-card-stats">
+        {tiles} tiles · {seeds} seeds
+      </span>
     </div>
   );
 }
