@@ -1,3 +1,5 @@
+import clsx from "clsx";
+
 import type { BlobWarsBoardStoreInstance } from "@/board-store";
 import { useTileData } from "@/board-store";
 import type { PlayerSeat } from "@shared/protocol";
@@ -20,10 +22,11 @@ export function Board({ store, width, height, seat, canPlant, onPlant }: BoardPr
     }
   }
 
-  const boardClass = seat ? `board board-seat-${seat}` : "board";
-
   return (
-    <div className={boardClass} style={{ gridTemplateColumns: `repeat(${width}, 1fr)` }}>
+    <div
+      className={clsx("board", seat && `board-seat-${seat}`)}
+      style={{ gridTemplateColumns: `repeat(${width}, 1fr)` }}
+    >
       {cells.map(({ x, y }) => (
         <Tile
           key={`${x}-${y}`}
@@ -52,41 +55,18 @@ function Tile({ store, x, y, canPlant, onPlant }: TileProps) {
   const ownerClass = tile.owner ?? "empty";
   const originClass = tile.origin ?? "empty";
   const disabled = isWall || tile.owner !== null || tile.insideExclusion || !canPlant;
-  const title = isWall
-    ? `(${x}, ${y}) impassable`
-    : tile.owner !== null
-      ? `(${x}, ${y}) ${tile.owner} ${tile.origin ?? "spread"}`
-      : tile.insideExclusion
-        ? `(${x}, ${y}) too close to an existing seed`
-        : canPlant
-          ? `Plant at (${x}, ${y})`
-          : `(${x}, ${y})`;
-  const ariaLabel = isWall
-    ? `Impassable tile at ${x}, ${y}`
-    : tile.owner !== null
-      ? `Tile ${x}, ${y} owned by ${tile.owner}, ${tile.origin ?? "spread"}`
-      : tile.insideExclusion
-        ? `Tile ${x}, ${y} is inside another seed's exclusion zone`
-        : canPlant
-          ? `Plant seed at ${x}, ${y}`
-          : `Tile ${x}, ${y}`;
-  const classes = [
-    "tile",
-    isWall ? "tile-wall" : `tile-${ownerClass} tile-origin-${originClass}`,
-  ];
-  if (tile.insideExclusion) {
-    classes.push("tile-in-exclusion-zone");
-    classes.push(`tile-in-exclusion-zone-${tile.exclusionSource}`);
-  }
-  if (disabled) classes.push("tile-disabled");
 
   return (
     <div
-      className={classes.join(" ")}
-      title={title}
-      role="button"
-      aria-label={ariaLabel}
-      aria-disabled={disabled}
+      className={clsx(
+        "tile",
+        isWall ? "tile-wall" : [`tile-${ownerClass}`, `tile-origin-${originClass}`],
+        tile.insideExclusion && [
+          "tile-in-exclusion-zone",
+          `tile-in-exclusion-zone-${tile.exclusionSource}`,
+        ],
+        disabled && "tile-disabled",
+      )}
       onClick={disabled ? undefined : () => onPlant(x, y)}
     />
   );
