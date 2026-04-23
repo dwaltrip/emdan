@@ -35,7 +35,6 @@ export function startServer(port = getPort(), host = getHost()): RunningServer {
     const client = {
       id: randomUUID(),
       socket,
-      seat: null,
     };
 
     lobby.addConnection(client);
