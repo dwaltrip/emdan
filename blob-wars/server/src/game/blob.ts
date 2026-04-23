@@ -1,5 +1,5 @@
-import type { PlayerSeat } from "../../../shared/protocol.ts";
-import { getNeighborCoordinates, type Tile } from "./board.ts";
+import type { PlayerSeat } from "@shared/protocol";
+import { getNeighborCoordinates, type Tile } from "./board";
 
 export interface BlobAnalysis {
   componentIds: (number | null)[][];

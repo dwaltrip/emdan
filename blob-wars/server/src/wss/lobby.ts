@@ -1,13 +1,13 @@
 import WebSocket from "ws";
 
-import type { ClientConnection } from "./connection.ts";
-import { Match } from "../game/match.ts";
+import type { ClientConnection } from "./connection";
+import { Match } from "@/game/match";
 import {
   type ClientMessage,
   type PlayerSeat,
   type ServerMessage,
   serializeServerMessage,
-} from "../../../shared/protocol.ts";
+} from "@shared/protocol";
 
 export class GlobalLobby {
   private readonly clients = new Map<string, ClientConnection>();

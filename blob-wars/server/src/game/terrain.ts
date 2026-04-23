@@ -1,4 +1,4 @@
-import type { TileTerrain } from "../../../shared/protocol.ts";
+import type { TileTerrain } from "@shared/protocol";
 
 const INITIAL_WALL_CHANCE = 0.45;
 const CA_PASSES = 4;

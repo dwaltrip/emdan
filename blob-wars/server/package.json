@@ -7,8 +7,8 @@
   "scripts": {
     "build": "tsc -p .",
     "check": "tsc --noEmit -p .",
-    "start": "node --experimental-strip-types src/index.ts",
-    "dev": "node --watch --experimental-strip-types src/index.ts",
+    "start": "tsx src/index.ts",
+    "dev": "tsx watch src/index.ts",
     "test": "echo \"No tests configured\""
   },
   "keywords": [],
@@ -22,6 +22,7 @@
   "devDependencies": {
     "@types/node": "^25.6.0",
     "@types/ws": "^8.18.1",
+    "tsx": "^4.21.0",
     "typescript": "^6.0.3"
   }
 }

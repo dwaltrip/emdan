@@ -3,8 +3,8 @@ import {
   GRID_WIDTH,
   type PlayerSeat,
   type TileTerrain,
-} from "../../../shared/protocol.ts";
-import { generateTerrain } from "./terrain.ts";
+} from "@shared/protocol";
+import { generateTerrain } from "./terrain";
 
 export interface Tile {
   terrain: TileTerrain;

@@ -7,9 +7,14 @@
 
     // Environment Settings
     // See also https://aka.ms/tsconfig/module
-    "module": "nodenext",
+    "module": "esnext",
+    "moduleResolution": "bundler",
     "target": "esnext",
     "types": [],
+    "paths": {
+      "@/*": ["./src/*"],
+      "@shared/*": ["../shared/*"]
+    },
     // For nodejs:
     // "lib": ["esnext"],
     // "types": ["node"],
@@ -41,8 +46,7 @@
     "moduleDetection": "force",
     "skipLibCheck": true,
 
-    "noEmit": true,
-    "allowImportingTsExtensions": true
+    "noEmit": true
   },
   "include": ["src", "../shared/**/*.ts"]
 }

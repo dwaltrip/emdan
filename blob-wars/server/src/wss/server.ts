@@ -3,8 +3,8 @@ import { randomUUID } from "node:crypto";
 
 import WebSocket, { WebSocketServer } from "ws";
 
-import { GlobalLobby } from "./lobby.ts";
-import { parseClientMessage, serializeServerMessage } from "../../../shared/protocol.ts";
+import { GlobalLobby } from "./lobby";
+import { parseClientMessage, serializeServerMessage } from "@shared/protocol";
 
 export interface RunningServer {
   close: () => Promise<void>;

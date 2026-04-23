@@ -1,3 +1,3 @@
-import { startServer } from "./wss/server.ts";
+import { startServer } from "./wss/server";
 
 startServer();

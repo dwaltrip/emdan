@@ -10,7 +10,7 @@ import {
   type MatchWinner,
   type PlayerSeat,
   type ServerMessage,
-} from "../../../shared/protocol.ts";
+} from "@shared/protocol";
 import {
   clearTile,
   countTiles,
@@ -20,8 +20,8 @@ import {
   isInsideBoard,
   otherSeat,
   type Tile,
-} from "./board.ts";
-import { addClaim, analyzeBlobs, determineClaimWinner, type TileClaim } from "./blob.ts";
+} from "./board";
+import { addClaim, analyzeBlobs, determineClaimWinner, type TileClaim } from "./blob";
 
 interface QueuedAction {
   clientId: string;
