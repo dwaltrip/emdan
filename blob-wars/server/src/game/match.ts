@@ -1,5 +1,3 @@
-import WebSocket from "ws";
-
 import {
   GROWTH_EVERY_TICKS,
   GRID_HEIGHT,
@@ -12,9 +10,7 @@ import {
   type MatchWinner,
   type PlayerSeat,
   type ServerMessage,
-  serializeServerMessage,
 } from "../../../shared/protocol.ts";
-import type { AssignedClientConnection, ClientConnection } from "../wss/connection.ts";
 import {
   clearTile,
   countTiles,
@@ -26,6 +22,7 @@ import {
   type Tile,
 } from "./board.ts";
 import { addClaim, analyzeBlobs, determineClaimWinner, type TileClaim } from "./blob.ts";
+import type { MatchTransport } from "./transport.ts";
 
 interface QueuedAction {
   clientId: string;
@@ -35,13 +32,16 @@ interface QueuedAction {
 }
 
 interface MatchOptions {
-  onEnded: (players: ClientConnection[]) => void;
+  clientIds: Record<PlayerSeat, string>;
+  transport: MatchTransport;
+  onEnded: () => void;
 }
 
 export class Match {
   readonly id: string;
 
-  private readonly players: Record<PlayerSeat, AssignedClientConnection>;
+  private readonly clientIds: Record<PlayerSeat, string>;
+  private readonly transport: MatchTransport;
   private readonly onEnded: MatchOptions["onEnded"];
   private readonly board: Tile[][];
   private readonly startedAt = Date.now();
@@ -51,12 +51,10 @@ export class Match {
   private timer: NodeJS.Timeout | null = null;
   private ended = false;
 
-  constructor(player1: AssignedClientConnection, player2: AssignedClientConnection, options: MatchOptions) {
+  constructor(options: MatchOptions) {
     this.id = `match-${Date.now()}`;
-    this.players = {
-      player1,
-      player2,
-    };
+    this.clientIds = options.clientIds;
+    this.transport = options.transport;
     this.onEnded = options.onEnded;
     this.board = createBoard();
     this.seedsRemaining = {
@@ -80,7 +78,7 @@ export class Match {
   }
 
   hasClient(clientId: string): boolean {
-    return this.players.player1.id === clientId || this.players.player2.id === clientId;
+    return this.clientIds.player1 === clientId || this.clientIds.player2 === clientId;
   }
 
   handleClientMessage(clientId: string, message: Exclude<ClientMessage, { type: "joinLobby" }>): void {
@@ -88,8 +86,8 @@ export class Match {
       return;
     }
 
-    const player = this.getPlayerById(clientId);
-    if (!player) {
+    const seat = this.getSeatByClientId(clientId);
+    if (!seat) {
       return;
     }
 
@@ -98,18 +96,18 @@ export class Match {
     }
 
     if (!Number.isInteger(message.x) || !Number.isInteger(message.y)) {
-      this.sendError(player, "invalid_coordinates", "Seed coordinates must be integers.");
+      this.sendError(seat, "invalid_coordinates", "Seed coordinates must be integers.");
       return;
     }
 
     if (!isInsideBoard(message.x, message.y)) {
-      this.sendError(player, "out_of_bounds", "Seed coordinates are outside the board.");
+      this.sendError(seat, "out_of_bounds", "Seed coordinates are outside the board.");
       return;
     }
 
     this.queuedActions.push({
       clientId,
-      seat: player.seat,
+      seat,
       x: message.x,
       y: message.y,
     });
@@ -120,12 +118,12 @@ export class Match {
       return;
     }
 
-    const player = this.getPlayerById(clientId);
-    if (!player) {
+    const seat = this.getSeatByClientId(clientId);
+    if (!seat) {
       return;
     }
 
-    const winner = otherSeat(player.seat);
+    const winner = otherSeat(seat);
     this.finish("disconnect", winner);
   }
 
@@ -154,8 +152,8 @@ export class Match {
 
   private applyQueuedActions(): void {
     for (const action of this.queuedActions.splice(0)) {
-      const player = this.getPlayerById(action.clientId);
-      if (!player || player.seat !== action.seat) {
+      const seat = this.getSeatByClientId(action.clientId);
+      if (!seat || seat !== action.seat) {
         continue;
       }
 
@@ -165,17 +163,17 @@ export class Match {
       }
 
       if (this.seedsRemaining[action.seat] <= 0) {
-        this.sendError(player, "no_seeds", "You are out of seeds.");
+        this.sendError(action.seat, "no_seeds", "You are out of seeds.");
         continue;
       }
 
       if (tile.terrain === "wall") {
-        this.sendError(player, "tile_impassable", "That tile is impassable.");
+        this.sendError(action.seat, "tile_impassable", "That tile is impassable.");
         continue;
       }
 
       if (tile.owner !== null) {
-        this.sendError(player, "tile_occupied", "That tile is already occupied.");
+        this.sendError(action.seat, "tile_occupied", "That tile is already occupied.");
         continue;
       }
 
@@ -275,7 +273,7 @@ export class Match {
       state: snapshot,
     });
 
-    this.onEnded([this.players.player1, this.players.player2]);
+    this.onEnded();
   }
 
   private getSnapshot(): MatchSnapshot {
@@ -294,12 +292,12 @@ export class Match {
       },
       players: {
         player1: {
-          connected: this.players.player1.socket.readyState === WebSocket.OPEN,
+          connected: this.transport.isConnected("player1"),
           occupiedTiles: counts.player1,
           seedsRemaining: this.seedsRemaining.player1,
         },
         player2: {
-          connected: this.players.player2.socket.readyState === WebSocket.OPEN,
+          connected: this.transport.isConnected("player2"),
           occupiedTiles: counts.player2,
           seedsRemaining: this.seedsRemaining.player2,
         },
@@ -308,33 +306,25 @@ export class Match {
   }
 
   private sendToAll(message: ServerMessage | ((seat: PlayerSeat) => ServerMessage)): void {
-    this.send(this.players.player1, typeof message === "function" ? message("player1") : message);
-    this.send(this.players.player2, typeof message === "function" ? message("player2") : message);
+    this.transport.send("player1", typeof message === "function" ? message("player1") : message);
+    this.transport.send("player2", typeof message === "function" ? message("player2") : message);
   }
 
-  private send(player: AssignedClientConnection, message: ServerMessage): void {
-    if (player.socket.readyState !== WebSocket.OPEN) {
-      return;
-    }
-
-    player.socket.send(serializeServerMessage(message));
-  }
-
-  private sendError(player: AssignedClientConnection, code: string, message: string): void {
-    this.send(player, {
+  private sendError(seat: PlayerSeat, code: string, message: string): void {
+    this.transport.send(seat, {
       type: "error",
       code,
       message,
     });
   }
 
-  private getPlayerById(clientId: string): AssignedClientConnection | null {
-    if (this.players.player1.id === clientId) {
-      return this.players.player1;
+  private getSeatByClientId(clientId: string): PlayerSeat | null {
+    if (this.clientIds.player1 === clientId) {
+      return "player1";
     }
 
-    if (this.players.player2.id === clientId) {
-      return this.players.player2;
+    if (this.clientIds.player2 === clientId) {
+      return "player2";
     }
 
     return null;

@@ -2,8 +2,10 @@ import WebSocket from "ws";
 
 import type { AssignedClientConnection, ClientConnection } from "./connection.ts";
 import { Match } from "../game/match.ts";
+import type { MatchTransport } from "../game/transport.ts";
 import {
   type ClientMessage,
+  type PlayerSeat,
   type ServerMessage,
   serializeServerMessage,
 } from "../../../shared/protocol.ts";
@@ -99,12 +101,14 @@ export class GlobalLobby {
     }
 
     this.waitingClientIds.length = 0;
-    this.activeMatch = new Match(player1, player2, {
-      onEnded: (players) => {
-        for (const player of players) {
-          player.seat = null;
-        }
-
+    const p1: ClientConnection = player1;
+    const p2: ClientConnection = player2;
+    this.activeMatch = new Match({
+      clientIds: { player1: player1.id, player2: player2.id },
+      transport: createMatchTransport(player1, player2),
+      onEnded: () => {
+        p1.seat = null;
+        p2.seat = null;
         this.activeMatch = null;
       },
     });
@@ -159,4 +163,23 @@ function isAssignedSeat(
   seat: AssignedClientConnection["seat"],
 ): client is AssignedClientConnection {
   return client !== null && client !== undefined && client.seat === seat;
+}
+
+function createMatchTransport(
+  player1: AssignedClientConnection,
+  player2: AssignedClientConnection,
+): MatchTransport {
+  const bySeat: Record<PlayerSeat, AssignedClientConnection> = { player1, player2 };
+  return {
+    send(seat, message) {
+      const { socket } = bySeat[seat];
+      if (socket.readyState !== WebSocket.OPEN) {
+        return;
+      }
+      socket.send(serializeServerMessage(message));
+    },
+    isConnected(seat) {
+      return bySeat[seat].socket.readyState === WebSocket.OPEN;
+    },
+  };
 }
