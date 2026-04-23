@@ -2,7 +2,6 @@ import WebSocket from "ws";
 
 import type { AssignedClientConnection, ClientConnection } from "./connection.ts";
 import { Match } from "../game/match.ts";
-import type { MatchTransport } from "../game/transport.ts";
 import {
   type ClientMessage,
   type PlayerSeat,
@@ -12,7 +11,7 @@ import {
 
 export class GlobalLobby {
   private readonly clients = new Map<string, ClientConnection>();
-  private readonly waitingClientIds: string[] = [];
+  private readonly waitingPlayers: AssignedClientConnection[] = [];
   private activeMatch: Match | null = null;
 
   addConnection(client: ClientConnection): void {
@@ -51,7 +50,7 @@ export class GlobalLobby {
       return;
     }
 
-    if (this.waitingClientIds.includes(clientId)) {
+    if (this.isWaiting(clientId)) {
       this.sendError(client, "match_not_started", "Wait for a second player before sending game actions.");
       return;
     }
@@ -65,50 +64,52 @@ export class GlobalLobby {
       return;
     }
 
-    if (this.waitingClientIds.includes(client.id)) {
+    if (this.isWaiting(client.id)) {
       this.broadcastLobbyUpdate();
       return;
     }
 
-    if (this.waitingClientIds.length >= 2) {
+    if (this.waitingPlayers.length >= 2) {
       this.sendError(client, "lobby_full", "The prototype lobby is full.");
       return;
     }
 
-    const seat = this.waitingClientIds.length === 0 ? "player1" : "player2";
+    const seat: PlayerSeat = this.waitingPlayers.length === 0 ? "player1" : "player2";
     client.seat = seat;
-    this.waitingClientIds.push(client.id);
+    this.waitingPlayers.push(client as AssignedClientConnection);
 
-    this.send(client, {
-      type: "welcome",
-      seat,
-    });
+    this.send(client, { type: "welcome", seat });
 
     this.broadcastLobbyUpdate();
 
-    if (this.waitingClientIds.length === 2) {
+    if (this.waitingPlayers.length === 2) {
       this.startMatch();
     }
   }
 
   private startMatch(): void {
-    const [player1Id, player2Id] = this.waitingClientIds;
-    const player1 = player1Id ? this.clients.get(player1Id) : null;
-    const player2 = player2Id ? this.clients.get(player2Id) : null;
-
-    if (!isAssignedSeat(player1, "player1") || !isAssignedSeat(player2, "player2")) {
+    const [player1, player2] = this.waitingPlayers;
+    if (!player1 || !player2) {
       return;
     }
 
-    this.waitingClientIds.length = 0;
-    const p1: ClientConnection = player1;
-    const p2: ClientConnection = player2;
+    this.waitingPlayers.length = 0;
+    const bySeat: Record<PlayerSeat, AssignedClientConnection> = { player1, player2 };
     this.activeMatch = new Match({
       clientIds: { player1: player1.id, player2: player2.id },
-      transport: createMatchTransport(player1, player2),
+      send: (seat, message) => {
+        const { socket } = bySeat[seat];
+        if (socket.readyState !== WebSocket.OPEN) {
+          return;
+        }
+        socket.send(serializeServerMessage(message));
+      },
+      isConnected: (seat) => bySeat[seat].socket.readyState === WebSocket.OPEN,
       onEnded: () => {
-        p1.seat = null;
-        p2.seat = null;
+        const c1 = this.clients.get(player1.id);
+        const c2 = this.clients.get(player2.id);
+        if (c1) c1.seat = null;
+        if (c2) c2.seat = null;
         this.activeMatch = null;
       },
     });
@@ -118,27 +119,28 @@ export class GlobalLobby {
   private broadcastLobbyUpdate(): void {
     const message = {
       type: "lobbyUpdate" as const,
-      playersConnected: this.waitingClientIds.length,
+      playersConnected: this.waitingPlayers.length,
       requiredPlayers: 2,
-      ready: this.waitingClientIds.length === 2,
+      ready: this.waitingPlayers.length === 2,
     };
 
-    for (const clientId of this.waitingClientIds) {
-      const client = this.clients.get(clientId);
-      if (client) {
-        this.send(client, message);
-      }
+    for (const player of this.waitingPlayers) {
+      this.send(player, message);
     }
   }
 
   private removeWaitingClient(clientId: string): void {
-    const index = this.waitingClientIds.indexOf(clientId);
+    const index = this.waitingPlayers.findIndex((p) => p.id === clientId);
     if (index === -1) {
       return;
     }
 
-    this.waitingClientIds.splice(index, 1);
+    this.waitingPlayers.splice(index, 1);
     this.broadcastLobbyUpdate();
+  }
+
+  private isWaiting(clientId: string): boolean {
+    return this.waitingPlayers.some((p) => p.id === clientId);
   }
 
   private send(client: ClientConnection, message: ServerMessage): void {
@@ -156,30 +158,4 @@ export class GlobalLobby {
       message,
     });
   }
-}
-
-function isAssignedSeat(
-  client: ClientConnection | null | undefined,
-  seat: AssignedClientConnection["seat"],
-): client is AssignedClientConnection {
-  return client !== null && client !== undefined && client.seat === seat;
-}
-
-function createMatchTransport(
-  player1: AssignedClientConnection,
-  player2: AssignedClientConnection,
-): MatchTransport {
-  const bySeat: Record<PlayerSeat, AssignedClientConnection> = { player1, player2 };
-  return {
-    send(seat, message) {
-      const { socket } = bySeat[seat];
-      if (socket.readyState !== WebSocket.OPEN) {
-        return;
-      }
-      socket.send(serializeServerMessage(message));
-    },
-    isConnected(seat) {
-      return bySeat[seat].socket.readyState === WebSocket.OPEN;
-    },
-  };
 }
