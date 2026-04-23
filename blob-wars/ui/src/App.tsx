@@ -53,6 +53,14 @@ function App() {
     });
   }
 
+  const canPlant =
+    status === "connected" &&
+    seat !== null &&
+    latestSnapshot !== null &&
+    latestSnapshot.phase === "placing" &&
+    latestSnapshot.currentTurn === seat &&
+    latestSnapshot.players[seat].seedsRemaining > 0;
+
   if (seat !== null) {
     return (
       <>
@@ -62,7 +70,8 @@ function App() {
             store={store}
             width={GRID_WIDTH}
             height={GRID_HEIGHT}
-            connected={status === "connected"}
+            seat={seat}
+            canPlant={canPlant}
             onPlant={plantSeed}
           />
           <DebugPanel latestMessage={latestMessage} logs={logs} />

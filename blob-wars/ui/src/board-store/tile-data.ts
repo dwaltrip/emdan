@@ -9,7 +9,8 @@ function tilesEqual(a: TileData, b: TileData): boolean {
     a.origin === b.origin &&
     a.isPlaceable === b.isPlaceable &&
     a.isHovered === b.isHovered &&
-    a.insideExclusion === b.insideExclusion
+    a.insideExclusion === b.insideExclusion &&
+    a.exclusionSource === b.exclusionSource
   );
 }
 

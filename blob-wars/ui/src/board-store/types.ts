@@ -31,10 +31,12 @@ interface BlobWarsInputState {
 }
 
 interface DerivedState {
-  excludedCoords: Set<CoordKey>;
+  excludedCoords: Map<CoordKey, Set<PlayerId>>;
 }
 
 type BlobWarsState = BlobWarsInputState & DerivedState;
+
+type ExclusionSource = PlayerId | 'both' | null;
 
 interface TileData {
   coord: Coord;
@@ -44,6 +46,7 @@ interface TileData {
   isPlaceable: boolean;
   isHovered: boolean;
   insideExclusion: boolean;
+  exclusionSource: ExclusionSource;
 }
 
 export type {
@@ -56,5 +59,6 @@ export type {
   BlobWarsInputState,
   DerivedState,
   BlobWarsState,
+  ExclusionSource,
   TileData,
 };
