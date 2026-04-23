@@ -1,7 +1,7 @@
 import type { MatchSnapshot } from '@shared/protocol';
 
 import type { BlobWarsBoardStoreInstance } from './board-store';
-import type { BlobWarsInputState, Coord } from './types';
+import type { BlobWarsInputState } from './types';
 
 function createActions(store: BlobWarsBoardStoreInstance) {
   return {
@@ -14,12 +14,6 @@ function createActions(store: BlobWarsBoardStoreInstance) {
         state.game.phase = snapshot.phase;
         state.game.currentTurn = snapshot.currentTurn;
         state.game.players = snapshot.players;
-      },
-    ),
-
-    setHoveredCoord: store.makeAction(
-      (state: BlobWarsInputState, coord: Coord | null) => {
-        state.ui.hoveredCoord = coord;
       },
     ),
   };

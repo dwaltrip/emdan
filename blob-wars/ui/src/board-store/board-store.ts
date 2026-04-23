@@ -61,7 +61,7 @@ function createDefaultGameState(width: number, height: number): BlobWarsSourceSt
 }
 
 function createDefaultUIState(): UIState {
-  return { hoveredCoord: null };
+  return {};
 }
 
 function createDefaultInputState(width: number, height: number): BlobWarsInputState {
@@ -78,7 +78,6 @@ function createDefaultTileData(coord: Coord): TileData {
     owner: null,
     origin: null,
     isPlaceable: true,
-    isHovered: false,
     insideExclusion: false,
     exclusionSource: null,
   };

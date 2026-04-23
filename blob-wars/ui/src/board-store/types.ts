@@ -21,9 +21,9 @@ interface BlobWarsSourceState {
   players: Record<PlayerSeat, PlayerState>;
 }
 
-interface UIState {
-  hoveredCoord: Coord | null;
-}
+// Seam: kept for future client-side UI state (selection, drag, modals, etc).
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+interface UIState {}
 
 interface BlobWarsInputState {
   game: BlobWarsSourceState;
@@ -44,7 +44,6 @@ interface TileData {
   owner: PlayerSeat | null;
   origin: TileOrigin | null;
   isPlaceable: boolean;
-  isHovered: boolean;
   insideExclusion: boolean;
   exclusionSource: ExclusionSource;
 }
