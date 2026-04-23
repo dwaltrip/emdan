@@ -1,6 +1,6 @@
 import WebSocket from "ws";
 
-import type { AssignedClientConnection, ClientConnection } from "./connection.ts";
+import type { ClientConnection } from "./connection.ts";
 import { Match } from "../game/match.ts";
 import {
   type ClientMessage,
@@ -11,7 +11,7 @@ import {
 
 export class GlobalLobby {
   private readonly clients = new Map<string, ClientConnection>();
-  private readonly waitingPlayers: AssignedClientConnection[] = [];
+  private readonly waitingPlayers: ClientConnection[] = [];
   private activeMatch: Match | null = null;
 
   addConnection(client: ClientConnection): void {
@@ -30,7 +30,6 @@ export class GlobalLobby {
       this.removeWaitingClient(clientId);
     }
 
-    client.seat = null;
     this.clients.delete(clientId);
   }
 
@@ -75,8 +74,7 @@ export class GlobalLobby {
     }
 
     const seat: PlayerSeat = this.waitingPlayers.length === 0 ? "player1" : "player2";
-    client.seat = seat;
-    this.waitingPlayers.push(client as AssignedClientConnection);
+    this.waitingPlayers.push(client);
 
     this.send(client, { type: "welcome", seat });
 
@@ -94,7 +92,7 @@ export class GlobalLobby {
     }
 
     this.waitingPlayers.length = 0;
-    const bySeat: Record<PlayerSeat, AssignedClientConnection> = { player1, player2 };
+    const bySeat: Record<PlayerSeat, ClientConnection> = { player1, player2 };
     this.activeMatch = new Match({
       clientIds: { player1: player1.id, player2: player2.id },
       send: (seat, message) => {
@@ -106,10 +104,6 @@ export class GlobalLobby {
       },
       isConnected: (seat) => bySeat[seat].socket.readyState === WebSocket.OPEN,
       onEnded: () => {
-        const c1 = this.clients.get(player1.id);
-        const c2 = this.clients.get(player2.id);
-        if (c1) c1.seat = null;
-        if (c2) c2.seat = null;
         this.activeMatch = null;
       },
     });
