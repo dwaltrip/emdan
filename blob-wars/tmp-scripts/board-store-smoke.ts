@@ -25,6 +25,8 @@ function snapshotOf(tiles: TileState[][], tick = 0): MatchSnapshot {
     serverTimeMs: 0,
     tickIntervalMs: 1000,
     growthEveryTicks: 10,
+    phase: "simulating",
+    currentTurn: null,
     board: { width: tiles[0].length, height: tiles.length, tiles },
     players: {
       player1: { connected: true, occupiedTiles: 0, seedsRemaining: 0 },

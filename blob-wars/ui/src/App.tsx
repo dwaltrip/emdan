@@ -36,7 +36,13 @@ function App() {
   }, [latestSnapshot, actions]);
 
   function plantSeed(x: number, y: number): void {
-    if (seat !== null && latestSnapshot && latestSnapshot.players[seat].seedsRemaining <= 0) {
+    if (seat === null || !latestSnapshot) {
+      return;
+    }
+    if (latestSnapshot.phase !== "placing" || latestSnapshot.currentTurn !== seat) {
+      return;
+    }
+    if (latestSnapshot.players[seat].seedsRemaining <= 0) {
       return;
     }
 
@@ -116,6 +122,7 @@ function MatchDetails({ snapshot, seat }: MatchDetailsProps) {
       <div className="match-meta">
         <span>Match: {snapshot.matchId}</span>
         <span>Tick: {snapshot.tick}</span>
+        <span>{describePhase(snapshot, seat)}</span>
       </div>
       <div className="player-cards">
         <PlayerCard
@@ -133,6 +140,18 @@ function MatchDetails({ snapshot, seat }: MatchDetailsProps) {
       </div>
     </div>
   );
+}
+
+function describePhase(
+  snapshot: MatchDetailsProps["snapshot"],
+  seat: MatchDetailsProps["seat"],
+): string {
+  if (snapshot.phase === "placing") {
+    if (snapshot.currentTurn === seat) return "Your turn to place a seed";
+    return "Opponent placing…";
+  }
+  if (snapshot.phase === "simulating") return "Simulating…";
+  return "Match ended";
 }
 
 interface PlayerCardProps {

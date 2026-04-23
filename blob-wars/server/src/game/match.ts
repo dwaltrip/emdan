@@ -2,10 +2,12 @@ import {
   GROWTH_EVERY_TICKS,
   GRID_HEIGHT,
   GRID_WIDTH,
+  SEED_EXCLUSION_RADIUS,
   STARTING_SEEDS,
   TICK_INTERVAL_MS,
   type ClientMessage,
   type MatchEndReason,
+  type MatchPhase,
   type MatchSnapshot,
   type MatchWinner,
   type PlayerSeat,
@@ -46,11 +48,12 @@ export class Match {
   private readonly onEnded: MatchOptions["onEnded"];
   private readonly board: Tile[][];
   private readonly startedAt = Date.now();
-  private readonly queuedActions: QueuedAction[] = [];
   private readonly seedsRemaining: Record<PlayerSeat, number>;
   private tickNumber = 0;
   private timer: NodeJS.Timeout | null = null;
   private ended = false;
+  private phase: MatchPhase = "placing";
+  private currentTurn: PlayerSeat = "player1";
 
   constructor(options: MatchOptions) {
     this.id = `match-${Date.now()}`;
@@ -73,10 +76,6 @@ export class Match {
       seat,
       state: snapshot,
     }));
-
-    this.timer = setInterval(() => {
-      this.tick();
-    }, TICK_INTERVAL_MS);
   }
 
   hasClient(clientId: string): boolean {
@@ -107,12 +106,12 @@ export class Match {
       return;
     }
 
-    this.queuedActions.push({
-      clientId,
-      seat,
-      x: message.x,
-      y: message.y,
-    });
+    if (this.phase !== "placing") {
+      this.sendError(seat, "wrong_phase", "Seeds can only be placed during the placing phase.");
+      return;
+    }
+
+    this.applyPlacement({ clientId, seat, x: message.x, y: message.y });
   }
 
   handleDisconnect(clientId: string): void {
@@ -135,7 +134,6 @@ export class Match {
     }
 
     this.tickNumber += 1;
-    this.applyQueuedActions();
 
     if (this.tickNumber % GROWTH_EVERY_TICKS === 0) {
       this.expandSeeds();
@@ -152,39 +150,69 @@ export class Match {
     }
   }
 
-  private applyQueuedActions(): void {
-    for (const action of this.queuedActions.splice(0)) {
-      const seat = this.getSeatByClientId(action.clientId);
-      if (!seat || seat !== action.seat) {
-        continue;
-      }
-
-      const tile = this.board[action.y]?.[action.x];
-      if (!tile) {
-        continue;
-      }
-
-      if (this.seedsRemaining[action.seat] <= 0) {
-        this.sendError(action.seat, "no_seeds", "You are out of seeds.");
-        continue;
-      }
-
-      if (tile.terrain === "wall") {
-        this.sendError(action.seat, "tile_impassable", "That tile is impassable.");
-        continue;
-      }
-
-      if (tile.owner !== null) {
-        this.sendError(action.seat, "tile_occupied", "That tile is already occupied.");
-        continue;
-      }
-
-      tile.owner = action.seat;
-      tile.origin = "seed";
-      tile.plantedTick = this.tickNumber;
-      tile.lastGrowthTick = this.tickNumber;
-      this.seedsRemaining[action.seat] -= 1;
+  private applyPlacement(action: QueuedAction): void {
+    if (action.seat !== this.currentTurn) {
+      this.sendError(action.seat, "not_your_turn", "It is not your turn to place a seed.");
+      return;
     }
+
+    const tile = this.board[action.y]?.[action.x];
+    if (!tile) {
+      return;
+    }
+
+    if (this.seedsRemaining[action.seat] <= 0) {
+      this.sendError(action.seat, "no_seeds", "You are out of seeds.");
+      return;
+    }
+
+    if (tile.terrain === "wall") {
+      this.sendError(action.seat, "tile_impassable", "That tile is impassable.");
+      return;
+    }
+
+    if (tile.owner !== null) {
+      this.sendError(action.seat, "tile_occupied", "That tile is already occupied.");
+      return;
+    }
+
+    if (violatesExclusion(this.board, action.x, action.y, SEED_EXCLUSION_RADIUS)) {
+      this.sendError(
+        action.seat,
+        "too_close_to_seed",
+        `Seeds must be at least ${SEED_EXCLUSION_RADIUS} tiles from every other seed.`,
+      );
+      return;
+    }
+
+    tile.owner = action.seat;
+    tile.origin = "seed";
+    tile.plantedTick = this.tickNumber;
+    tile.lastGrowthTick = this.tickNumber;
+    this.seedsRemaining[action.seat] -= 1;
+    this.currentTurn = otherSeat(action.seat);
+
+    if (this.seedsRemaining.player1 === 0 && this.seedsRemaining.player2 === 0) {
+      this.beginSimulation();
+      return;
+    }
+
+    this.sendToAll({
+      type: "stateUpdate",
+      state: this.getSnapshot(),
+    });
+  }
+
+  private beginSimulation(): void {
+    this.phase = "simulating";
+    this.sendToAll({
+      type: "stateUpdate",
+      state: this.getSnapshot(),
+    });
+
+    this.timer = setInterval(() => {
+      this.tick();
+    }, TICK_INTERVAL_MS);
   }
 
   private expandSeeds(): void {
@@ -261,6 +289,7 @@ export class Match {
     }
 
     this.ended = true;
+    this.phase = "ended";
 
     if (this.timer) {
       clearInterval(this.timer);
@@ -287,6 +316,8 @@ export class Match {
       serverTimeMs: Date.now() - this.startedAt,
       tickIntervalMs: TICK_INTERVAL_MS,
       growthEveryTicks: GROWTH_EVERY_TICKS,
+      phase: this.phase,
+      currentTurn: this.phase === "placing" ? this.currentTurn : null,
       board: {
         width: GRID_WIDTH,
         height: GRID_HEIGHT,
@@ -331,6 +362,26 @@ export class Match {
 
     return null;
   }
+}
+
+function violatesExclusion(board: Tile[][], x: number, y: number, radius: number): boolean {
+  const minY = Math.max(0, y - radius);
+  const maxY = Math.min(board.length - 1, y + radius);
+
+  for (let ny = minY; ny <= maxY; ny += 1) {
+    const row = board[ny]!;
+    const remaining = radius - Math.abs(ny - y);
+    const minX = Math.max(0, x - remaining);
+    const maxX = Math.min(row.length - 1, x + remaining);
+
+    for (let nx = minX; nx <= maxX; nx += 1) {
+      if (row[nx]!.origin === "seed") {
+        return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 function determineWinner(snapshot: MatchSnapshot): MatchWinner {

@@ -11,6 +11,8 @@ function createActions(store: BlobWarsBoardStoreInstance) {
         state.game.height = snapshot.board.height;
         state.game.tiles = snapshot.board.tiles;
         state.game.tick = snapshot.tick;
+        state.game.phase = snapshot.phase;
+        state.game.currentTurn = snapshot.currentTurn;
         state.game.players = snapshot.players;
       },
     ),

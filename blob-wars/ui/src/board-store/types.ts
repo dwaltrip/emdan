@@ -1,4 +1,4 @@
-import type { PlayerSeat, PlayerState, TileOrigin, TileState, TileTerrain } from '@shared/protocol';
+import type { MatchPhase, PlayerSeat, PlayerState, TileOrigin, TileState, TileTerrain } from '@shared/protocol';
 
 type PlayerId = PlayerSeat;
 
@@ -16,6 +16,8 @@ interface BlobWarsSourceState {
   height: number;
   tiles: TileSource[][];
   tick: number;
+  phase: MatchPhase;
+  currentTurn: PlayerSeat | null;
   players: Record<PlayerSeat, PlayerState>;
 }
 
