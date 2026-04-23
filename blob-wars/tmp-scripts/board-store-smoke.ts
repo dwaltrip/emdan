@@ -73,23 +73,6 @@ run("per-tile diff fires only on changed tiles", () => {
   }
 });
 
-run("adjacent seeds form one blob with seedCount=2", () => {
-  const store = createBlobWarsBoardStore(3, 3);
-  const actions = createActions(store);
-
-  const tiles: TileState[][] = [
-    [seedTile("player1"), seedTile("player1"), emptyTile()],
-    [emptyTile(), emptyTile(), emptyTile()],
-    [emptyTile(), emptyTile(), emptyTile()],
-  ];
-  actions.applySnapshot(snapshotOf(tiles));
-
-  assert.equal(store.derived.blobs.size, 1, "one blob expected");
-  assert.equal(store.getTileData({ x: 0, y: 0 }).blobStrength, 2);
-  assert.equal(store.getTileData({ x: 1, y: 0 }).blobStrength, 2);
-  assert.equal(store.getTileData({ x: 2, y: 0 }).blobStrength, 0);
-});
-
 run("applySnapshot is idempotent (no fires on identical re-apply)", () => {
   const store = createBlobWarsBoardStore(3, 3);
   const actions = createActions(store);

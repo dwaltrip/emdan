@@ -28,22 +28,10 @@ interface BlobWarsInputState {
   ui: UIState;
 }
 
-type BlobId = number;
-
-interface Blob {
-  id: BlobId;
-  owner: PlayerSeat;
-  tiles: Coord[];
-  seedCount: number;
-  borderTiles: Coord[];
-}
-
-type GrowthDirection = 'positive' | 'neutral' | 'negative' | 'none';
-
-interface DerivedState {
-  blobs: Map<BlobId, Blob>;
-  tileToBlobId: Map<CoordKey, BlobId>;
-}
+// Placeholder. Add cross-tile derived fields here (blob membership, aggregate
+// stats, path overlays, etc.) and compute them in `deriveBlobWarsState`.
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+interface DerivedState {}
 
 type BlobWarsState = BlobWarsInputState & DerivedState;
 
@@ -52,8 +40,6 @@ interface TileData {
   terrain: TileTerrain;
   owner: PlayerSeat | null;
   origin: TileOrigin | null;
-  blobStrength: number;
-  growthDirection: GrowthDirection;
   isPlaceable: boolean;
   isHovered: boolean;
 }
@@ -66,9 +52,6 @@ export type {
   BlobWarsSourceState,
   UIState,
   BlobWarsInputState,
-  BlobId,
-  Blob,
-  GrowthDirection,
   DerivedState,
   BlobWarsState,
   TileData,

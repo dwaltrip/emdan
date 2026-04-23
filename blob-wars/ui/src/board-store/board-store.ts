@@ -75,8 +75,6 @@ function createDefaultTileData(coord: Coord): TileData {
     terrain: 'blank',
     owner: null,
     origin: null,
-    blobStrength: 0,
-    growthDirection: 'none',
     isPlaceable: true,
     isHovered: false,
   };
@@ -99,6 +97,7 @@ function createBlobWarsBoardStore(width: number, height: number) {
   function runPipeline(state: BlobWarsState): void {
     let changed = 0;
     let total = 0;
+    let newlyOccupied = 0;
     iterateCoords(state, (coord) => {
       total++;
       const key = serializeCoord(coord);
@@ -107,13 +106,18 @@ function createBlobWarsBoardStore(width: number, height: number) {
 
       if (!prev || !tilesEqual(prev, next)) {
         changed++;
+        if ((!prev || prev.owner === null) && next.owner !== null) {
+          newlyOccupied++;
+        }
         tileCache.set(key, next);
         const subs = tileSubs.get(key);
         if (subs) for (const cb of subs) cb();
       }
     });
     const paddedChanged = String(changed).padStart(String(total).length, ' ');
-    console.log(`[board-store] tiles re-rendered: ${paddedChanged}/${total} (tick ${state.game.tick})`);
+    console.log(
+      `[board-store] tiles re-rendered: ${paddedChanged}/${total} (tick ${state.game.tick}, newly occupied: ${newlyOccupied})`,
+    );
   }
 
   const store = createStore<BlobWarsInputState, DerivedState>({

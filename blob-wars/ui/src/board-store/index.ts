@@ -1,13 +1,10 @@
 export type {
-  Blob,
-  BlobId,
   BlobWarsInputState,
   BlobWarsSourceState,
   BlobWarsState,
   Coord,
   CoordKey,
   DerivedState,
-  GrowthDirection,
   PlayerId,
   TileData,
   TileSource,

@@ -58,18 +58,19 @@ function Tile({ store, x, y, connected, onPlant }: TileProps) {
     : tile.owner === null
       ? `Plant seed at ${x}, ${y}`
       : `Tile ${x}, ${y} owned by ${tile.owner}, ${tile.origin ?? "spread"}`;
-  const className = isWall
+  const baseClass = isWall
     ? "tile tile-wall"
     : `tile tile-${ownerClass} tile-origin-${originClass}`;
+  const className = disabled ? `${baseClass} tile-disabled` : baseClass;
 
   return (
-    <button
-      type="button"
+    <div
       className={className}
       title={title}
+      role="button"
       aria-label={ariaLabel}
-      disabled={disabled}
-      onClick={() => onPlant(x, y)}
+      aria-disabled={disabled}
+      onClick={disabled ? undefined : () => onPlant(x, y)}
     />
   );
 }
