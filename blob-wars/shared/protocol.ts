@@ -1,8 +1,8 @@
-export const GRID_WIDTH = 80;
-export const GRID_HEIGHT = 80;
+export const GRID_WIDTH = 60;
+export const GRID_HEIGHT = 40;
 export const TICK_INTERVAL_MS = 1000;
 export const GROWTH_EVERY_TICKS = 2;
-export const STARTING_SEEDS = 7;
+export const STARTING_SEEDS = 5;
 
 export type PlayerSeat = "player1" | "player2";
 export type MatchEndReason = "disconnect" | "boardFull";
