@@ -79,6 +79,7 @@ function createDefaultTileData(coord: Coord): TileData {
     origin: null,
     isPlaceable: true,
     isHovered: false,
+    insideExclusion: false,
   };
 }
 

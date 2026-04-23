@@ -8,7 +8,8 @@ function tilesEqual(a: TileData, b: TileData): boolean {
     a.owner === b.owner &&
     a.origin === b.origin &&
     a.isPlaceable === b.isPlaceable &&
-    a.isHovered === b.isHovered
+    a.isHovered === b.isHovered &&
+    a.insideExclusion === b.insideExclusion
   );
 }
 
