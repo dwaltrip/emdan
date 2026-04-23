@@ -9,7 +9,11 @@
     "skipLibCheck": true,
     "noEmit": true,
     "allowImportingTsExtensions": true,
-    "moduleDetection": "force"
+    "moduleDetection": "force",
+    "paths": {
+      "@/*": ["./ui/src/*"],
+      "@shared/*": ["./shared/*"]
+    }
   },
   "include": ["tmp-scripts/**/*.ts"]
 }
