@@ -1,5 +1,5 @@
-import type { BlobWarsBoardStoreInstance } from "../board-store";
-import { useTileData } from "../board-store";
+import type { BlobWarsBoardStoreInstance } from "@/board-store";
+import { useTileData } from "@/board-store";
 import "./board.css";
 
 interface BoardProps {

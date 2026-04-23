@@ -1,4 +1,4 @@
-import type { MatchSnapshot } from '../../../shared/protocol';
+import type { MatchSnapshot } from '@shared/protocol';
 
 import type { BlobWarsBoardStoreInstance } from './board-store';
 import type { BlobWarsInputState, Coord } from './types';

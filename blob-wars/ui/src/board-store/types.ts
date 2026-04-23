@@ -1,4 +1,4 @@
-import type { PlayerSeat, PlayerState, TileOrigin, TileState, TileTerrain } from '../../../shared/protocol';
+import type { PlayerSeat, PlayerState, TileOrigin, TileState, TileTerrain } from '@shared/protocol';
 
 type PlayerId = PlayerSeat;
 

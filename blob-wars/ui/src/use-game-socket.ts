@@ -7,7 +7,7 @@ import {
   type ServerMessage,
   parseServerMessage,
   serializeClientMessage,
-} from "../../shared/protocol.ts";
+} from "@shared/protocol";
 
 export type ConnectionStatus = "disconnected" | "connecting" | "connected";
 

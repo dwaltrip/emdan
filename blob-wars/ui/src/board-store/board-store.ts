@@ -10,8 +10,8 @@
 // - per-tile rendering is independent (no cross-tile sprite stitching)
 // - grid size fixed for the lifetime of a session
 
-import { createStore } from '../../../../shared/game-store/create-store';
-import type { PlayerState } from '../../../shared/protocol';
+import { createStore } from '@/lib/create-store';
+import type { PlayerState } from '@shared/protocol';
 
 import { serializeCoord } from './coord';
 import { deriveBlobWarsState } from './derived';
