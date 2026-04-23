@@ -51,6 +51,8 @@ function createDefaultGameState(width: number, height: number): BlobWarsSourceSt
     height,
     tiles: createEmptyTiles(width, height),
     tick: 0,
+    phase: 'placing',
+    currentTurn: 'player1',
     players: {
       player1: createDefaultPlayerState(),
       player2: createDefaultPlayerState(),

@@ -3,10 +3,12 @@ export const GRID_HEIGHT = 40;
 export const TICK_INTERVAL_MS = 1000;
 export const GROWTH_EVERY_TICKS = 2;
 export const STARTING_SEEDS = 5;
+export const SEED_EXCLUSION_RADIUS = 7;
 
 export type PlayerSeat = "player1" | "player2";
 export type MatchEndReason = "disconnect" | "boardFull";
 export type MatchWinner = PlayerSeat | "draw";
+export type MatchPhase = "placing" | "simulating" | "ended";
 export type TileOrigin = "seed" | "spread";
 export type TileTerrain = "blank" | "wall";
 
@@ -36,6 +38,8 @@ export interface MatchSnapshot {
   serverTimeMs: number;
   tickIntervalMs: number;
   growthEveryTicks: number;
+  phase: MatchPhase;
+  currentTurn: PlayerSeat | null;
   board: BoardState;
   players: Record<PlayerSeat, PlayerState>;
 }
@@ -234,9 +238,15 @@ function isMatchSnapshot(value: unknown): value is MatchSnapshot {
     typeof value.serverTimeMs === "number" &&
     typeof value.tickIntervalMs === "number" &&
     typeof value.growthEveryTicks === "number" &&
+    isMatchPhase(value.phase) &&
+    (value.currentTurn === null || isPlayerSeat(value.currentTurn)) &&
     isBoardState(value.board) &&
     isPlayersRecord(value.players)
   );
+}
+
+function isMatchPhase(value: unknown): value is MatchPhase {
+  return value === "placing" || value === "simulating" || value === "ended";
 }
 
 function isBoardState(value: unknown): value is BoardState {
