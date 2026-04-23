@@ -20,7 +20,7 @@ import {
   otherSeat,
   type Tile,
 } from "./board";
-import { manhattanNeighborhood } from "@shared/geometry";
+import { circularNeighborhood } from "@shared/geometry";
 import { addClaim, analyzeBlobs, determineClaimWinner, type TileClaim } from "./blob";
 
 export type PlaceErrorCode =
@@ -249,7 +249,7 @@ export class GameEngine {
 
 function violatesExclusion(board: Tile[][], x: number, y: number, radius: number): boolean {
   const bounds = { width: board[0]!.length, height: board.length };
-  for (const [nx, ny] of manhattanNeighborhood(x, y, radius, bounds)) {
+  for (const [nx, ny] of circularNeighborhood(x, y, radius, bounds)) {
     if (board[ny]![nx]!.origin === "seed") return true;
   }
   return false;

@@ -1,5 +1,5 @@
 import { SEED_EXCLUSION_RADIUS } from '@shared/protocol';
-import { manhattanNeighborhood } from '@shared/geometry';
+import { circularNeighborhood } from '@shared/geometry';
 
 import { serializeCoord } from './coord';
 import type { BlobWarsInputState, CoordKey, DerivedState, PlayerId } from './types';
@@ -17,7 +17,7 @@ function computeExcludedCoords(state: BlobWarsInputState): Map<CoordKey, Set<Pla
     for (let x = 0; x < state.game.width; x++) {
       const tile = state.game.tiles[y]![x]!;
       if (tile.origin !== 'seed' || tile.owner === null) continue;
-      for (const [nx, ny] of manhattanNeighborhood(x, y, SEED_EXCLUSION_RADIUS, bounds)) {
+      for (const [nx, ny] of circularNeighborhood(x, y, SEED_EXCLUSION_RADIUS, bounds)) {
         const key = serializeCoord({ x: nx, y: ny });
         let owners = excluded.get(key);
         if (!owners) {
