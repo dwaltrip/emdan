@@ -47,25 +47,31 @@ function Tile({ store, x, y, connected, onPlant }: TileProps) {
   const isWall = tile.terrain === "wall";
   const ownerClass = tile.owner ?? "empty";
   const originClass = tile.origin ?? "empty";
-  const disabled = isWall || tile.owner !== null || !connected;
+  const disabled = isWall || tile.owner !== null || tile.insideExclusion || !connected;
   const title = isWall
     ? `(${x}, ${y}) impassable`
-    : tile.owner === null
-      ? `Plant at (${x}, ${y})`
-      : `(${x}, ${y}) ${tile.owner} ${tile.origin ?? "spread"}`;
+    : tile.insideExclusion
+      ? `(${x}, ${y}) too close to an existing seed`
+      : tile.owner === null
+        ? `Plant at (${x}, ${y})`
+        : `(${x}, ${y}) ${tile.owner} ${tile.origin ?? "spread"}`;
   const ariaLabel = isWall
     ? `Impassable tile at ${x}, ${y}`
-    : tile.owner === null
-      ? `Plant seed at ${x}, ${y}`
-      : `Tile ${x}, ${y} owned by ${tile.owner}, ${tile.origin ?? "spread"}`;
-  const baseClass = isWall
-    ? "tile tile-wall"
-    : `tile tile-${ownerClass} tile-origin-${originClass}`;
-  const className = disabled ? `${baseClass} tile-disabled` : baseClass;
+    : tile.insideExclusion
+      ? `Tile ${x}, ${y} is inside another seed's exclusion zone`
+      : tile.owner === null
+        ? `Plant seed at ${x}, ${y}`
+        : `Tile ${x}, ${y} owned by ${tile.owner}, ${tile.origin ?? "spread"}`;
+  const classes = [
+    "tile",
+    isWall ? "tile-wall" : `tile-${ownerClass} tile-origin-${originClass}`,
+  ];
+  if (tile.insideExclusion) classes.push("tile-in-exclusion-zone");
+  if (disabled) classes.push("tile-disabled");
 
   return (
     <div
-      className={className}
+      className={classes.join(" ")}
       title={title}
       role="button"
       aria-label={ariaLabel}

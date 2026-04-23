@@ -30,10 +30,9 @@ interface BlobWarsInputState {
   ui: UIState;
 }
 
-// Placeholder. Add cross-tile derived fields here (blob membership, aggregate
-// stats, path overlays, etc.) and compute them in `deriveBlobWarsState`.
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
-interface DerivedState {}
+interface DerivedState {
+  excludedCoords: Set<CoordKey>;
+}
 
 type BlobWarsState = BlobWarsInputState & DerivedState;
 
@@ -44,6 +43,7 @@ interface TileData {
   origin: TileOrigin | null;
   isPlaceable: boolean;
   isHovered: boolean;
+  insideExclusion: boolean;
 }
 
 export type {

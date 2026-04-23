@@ -29,6 +29,10 @@
   cursor: default;
 }
 
+.tile-in-exclusion-zone {
+  background: rgba(160, 60, 60, 0.45);
+}
+
 .tile-player1 {
   --tile-color: #613fb0;
   background: #613fb0;
