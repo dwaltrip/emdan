@@ -17,31 +17,33 @@
 
 .hero-panel {
   margin-bottom: 16px;
+  display: grid;
+  gap: 16px;
 }
 
-.eyebrow {
-  margin: 0 0 12px;
-  color: var(--accent);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  font-size: 12px;
-  font-weight: 700;
+.hero-title {
+  margin: 0;
+  font-size: 32px;
+  letter-spacing: 0.01em;
 }
 
-.status-row,
-.button-row,
-.snapshot-summary {
+.hero-hint {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 14px;
+}
+
+.join-lobby-button {
+  justify-self: start;
+}
+
+.status-row {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
 }
 
-.status-row {
-  margin-top: 18px;
-}
-
-.status-pill,
-.meta-pill {
+.status-pill {
   display: inline-flex;
   align-items: center;
   border-radius: 999px;
@@ -63,28 +65,68 @@
   background: rgba(239, 68, 68, 0.15);
 }
 
-.field {
+.match-details {
   display: grid;
-  gap: 8px;
-  margin-bottom: 14px;
+  gap: 12px;
+  margin-bottom: 16px;
 }
 
-.field span {
-  font-size: 14px;
+.match-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 13px;
   color: var(--text-soft);
 }
 
-input,
-button {
-  font: inherit;
+.player-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
 }
 
-input {
+.player-card {
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 12px 14px;
-  background: var(--input-bg);
+  border-radius: 14px;
+  padding: 14px 16px;
+  background: var(--panel-bg);
+  display: grid;
+  gap: 8px;
+}
+
+.player-card-you {
+  border-color: var(--accent-border, var(--accent));
+  background: var(--accent-bg);
+}
+
+.player-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.player-card-label {
+  font-weight: 600;
+  font-size: 14px;
   color: var(--text-h);
+}
+
+.player-card-you-badge {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--chip-bg);
+  color: var(--text-h);
+}
+
+.player-card-stats {
+  display: flex;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text-soft);
 }
 
 button {
@@ -94,6 +136,7 @@ button {
   color: var(--text-h);
   background: var(--accent-bg);
   cursor: pointer;
+  font: inherit;
   transition:
     transform 120ms ease,
     border-color 120ms ease,

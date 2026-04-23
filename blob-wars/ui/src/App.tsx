@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 
 import {
   GRID_HEIGHT,
@@ -20,12 +20,8 @@ function App() {
     latestMessage,
     latestSnapshot,
     logs,
-    connect,
-    disconnect,
     send,
-  } = useGameSocket();
-
-  const [wsUrl, setWsUrl] = useState(DEFAULT_WS_URL);
+  } = useGameSocket(DEFAULT_WS_URL);
 
   const store = useMemo(
     () => createBlobWarsBoardStore(GRID_WIDTH, GRID_HEIGHT),
@@ -61,16 +57,7 @@ function App() {
   if (seat !== null) {
     return (
       <main className="app-shell match-shell">
-        {latestSnapshot && (
-          <div className="snapshot-summary">
-            <span>Match: {latestSnapshot.matchId}</span>
-            <span>Tick: {latestSnapshot.tick}</span>
-            <span>Player 1 tiles: {latestSnapshot.players.player1.occupiedTiles}</span>
-            <span>Player 2 tiles: {latestSnapshot.players.player2.occupiedTiles}</span>
-            <span>Player 1 seeds: {latestSnapshot.players.player1.seedsRemaining}</span>
-            <span>Player 2 seeds: {latestSnapshot.players.player2.seedsRemaining}</span>
-          </div>
-        )}
+        {latestSnapshot && <MatchDetails snapshot={latestSnapshot} seat={seat} />}
         <Board
           store={store}
           width={GRID_WIDTH}
@@ -86,41 +73,77 @@ function App() {
   return (
     <main className="app-shell">
       <section className="panel hero-panel">
-        <div>
-          <p className="eyebrow">Blob Wars UI</p>
-        </div>
-
+        <h1 className="hero-title">Blob Wars</h1>
         <div className="status-row">
           <span className={`status-pill status-${status}`}>{statusLabel}</span>
-          <span className="meta-pill">Board: {GRID_WIDTH} x {GRID_HEIGHT}</span>
         </div>
-      </section>
-
-      <section className="panel">
-        <h2>Connection</h2>
-        <label className="field">
-          <span>Websocket URL</span>
-          <input value={wsUrl} onChange={(event) => setWsUrl(event.target.value)} />
-        </label>
-
-        <div className="button-row">
-          <button onClick={() => connect(wsUrl)} disabled={status !== "disconnected"}>
-            Connect
-          </button>
-          <button onClick={disconnect} disabled={status === "disconnected"}>
-            Disconnect
-          </button>
+        {status === "connected" && (
           <button
             onClick={() => send({ type: "joinLobby" })}
-            disabled={status !== "connected"}
+            className="join-lobby-button"
           >
             Join lobby
           </button>
-        </div>
+        )}
+        {status === "connecting" && <p className="hero-hint">Connecting…</p>}
+        {status === "disconnected" && <p className="hero-hint">Lost connection. Refresh to retry.</p>}
       </section>
 
       <DebugPanel latestMessage={latestMessage} logs={logs} />
     </main>
+  );
+}
+
+interface MatchDetailsProps {
+  snapshot: NonNullable<ReturnType<typeof useGameSocket>["latestSnapshot"]>;
+  seat: NonNullable<ReturnType<typeof useGameSocket>["seat"]>;
+}
+
+function MatchDetails({ snapshot, seat }: MatchDetailsProps) {
+  return (
+    <div className="match-details">
+      <div className="match-meta">
+        <span>Match: {snapshot.matchId}</span>
+        <span>Tick: {snapshot.tick}</span>
+      </div>
+      <div className="player-cards">
+        <PlayerCard
+          label="Player 1"
+          tiles={snapshot.players.player1.occupiedTiles}
+          seeds={snapshot.players.player1.seedsRemaining}
+          isYou={seat === "player1"}
+        />
+        <PlayerCard
+          label="Player 2"
+          tiles={snapshot.players.player2.occupiedTiles}
+          seeds={snapshot.players.player2.seedsRemaining}
+          isYou={seat === "player2"}
+        />
+      </div>
+    </div>
+  );
+}
+
+interface PlayerCardProps {
+  label: string;
+  tiles: number;
+  seeds: number;
+  isYou: boolean;
+}
+
+function PlayerCard({ label, tiles, seeds, isYou }: PlayerCardProps) {
+  return (
+    <div className={`player-card${isYou ? " player-card-you" : ""}`}>
+      <div className="player-card-header">
+        <span className="player-card-label">{label}</span>
+        {isYou && <span className="player-card-you-badge">You</span>}
+      </div>
+      <div className="player-card-stats">
+        <span>{tiles} tiles</span>
+        <span>·</span>
+        <span>{seeds} seeds</span>
+      </div>
+    </div>
   );
 }
 

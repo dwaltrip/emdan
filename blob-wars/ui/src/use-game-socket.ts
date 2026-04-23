@@ -19,7 +19,7 @@ export interface LogEntry {
 
 const MAX_LOG_ENTRIES = 30;
 
-export function useGameSocket() {
+export function useGameSocket(url: string) {
   const socketRef = useRef<WebSocket | null>(null);
   const logIdRef = useRef(0);
 
@@ -28,13 +28,6 @@ export function useGameSocket() {
   const [latestMessage, setLatestMessage] = useState<ServerMessage | null>(null);
   const [latestSnapshot, setLatestSnapshot] = useState<MatchSnapshot | null>(null);
   const [logs, setLogs] = useState<LogEntry[]>([]);
-
-  useEffect(() => {
-    return () => {
-      socketRef.current?.close();
-      socketRef.current = null;
-    };
-  }, []);
 
   function appendLog(direction: LogEntry["direction"], text: string): void {
     const nextEntry: LogEntry = {
@@ -103,10 +96,6 @@ export function useGameSocket() {
     });
   }
 
-  function disconnect(): void {
-    socketRef.current?.close();
-  }
-
   function send(message: ClientMessage): void {
     const socket = socketRef.current;
     if (!socket || socket.readyState !== WebSocket.OPEN) {
@@ -119,14 +108,21 @@ export function useGameSocket() {
     appendLog("out", payload);
   }
 
+  useEffect(() => {
+    connect(url);
+    return () => {
+      socketRef.current?.close();
+      socketRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [url]);
+
   return {
     status,
     seat,
     latestMessage,
     latestSnapshot,
     logs,
-    connect,
-    disconnect,
     send,
   };
 }
