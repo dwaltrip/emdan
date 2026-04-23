@@ -3,7 +3,7 @@
 // Defaults: 80 x 80, 1 board.
 
 import { GRID_HEIGHT, GRID_WIDTH } from "../shared/protocol.ts";
-import { generateTerrain } from "../server/src/wss/terrain.ts";
+import { generateTerrain } from "../server/src/game/terrain.ts";
 
 const WALL = "█ ";
 const BLANK = "· ";

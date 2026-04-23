@@ -12,43 +12,26 @@ import {
   type MatchWinner,
   type PlayerSeat,
   type ServerMessage,
-  type TileTerrain,
   serializeServerMessage,
 } from "../../../shared/protocol.ts";
-import { generateTerrain } from "./terrain.ts";
-
-export interface ClientConnection {
-  id: string;
-  socket: WebSocket;
-  seat: PlayerSeat | null;
-}
-
-export interface AssignedClientConnection extends ClientConnection {
-  seat: PlayerSeat;
-}
-
-interface Tile {
-  terrain: TileTerrain;
-  owner: PlayerSeat | null;
-  origin: "seed" | "spread" | null;
-  plantedTick: number | null;
-  lastGrowthTick: number | null;
-}
+import type { AssignedClientConnection, ClientConnection } from "../wss/connection.ts";
+import {
+  clearTile,
+  countTiles,
+  createBoard,
+  getNeighborCoordinates,
+  isBoardFull,
+  isInsideBoard,
+  otherSeat,
+  type Tile,
+} from "./board.ts";
+import { addClaim, analyzeBlobs, determineClaimWinner, type TileClaim } from "./blob.ts";
 
 interface QueuedAction {
   clientId: string;
   seat: PlayerSeat;
   x: number;
   y: number;
-}
-
-interface BlobAnalysis {
-  componentIds: (number | null)[][];
-  componentPower: Map<number, number>;
-}
-
-interface TileClaim {
-  bySeat: Map<PlayerSeat, Set<number>>;
 }
 
 interface MatchOptions {
@@ -358,142 +341,6 @@ export class Match {
   }
 }
 
-function createBoard(): Tile[][] {
-  const terrain = generateTerrain(GRID_WIDTH, GRID_HEIGHT);
-  return terrain.map((row) =>
-    row.map((cell) => ({
-      terrain: cell,
-      owner: null,
-      origin: null,
-      plantedTick: null,
-      lastGrowthTick: null,
-    })),
-  );
-}
-
-function countTiles(board: Tile[][]): Record<PlayerSeat, number> {
-  const counts: Record<PlayerSeat, number> = {
-    player1: 0,
-    player2: 0,
-  };
-
-  for (const row of board) {
-    for (const tile of row) {
-      if (tile.owner) {
-        counts[tile.owner] += 1;
-      }
-    }
-  }
-
-  return counts;
-}
-
-function addClaim(
-  claims: Map<string, TileClaim>,
-  key: string,
-  seat: PlayerSeat,
-  componentId: number,
-): void {
-  const claim = claims.get(key) ?? { bySeat: new Map<PlayerSeat, Set<number>>() };
-  const componentIds = claim.bySeat.get(seat) ?? new Set<number>();
-  componentIds.add(componentId);
-  claim.bySeat.set(seat, componentIds);
-  claims.set(key, claim);
-}
-
-function analyzeBlobs(board: Tile[][]): BlobAnalysis {
-  const componentIds = board.map((row) => row.map(() => null as number | null));
-  const componentPower = new Map<number, number>();
-  let nextComponentId = 0;
-
-  for (let y = 0; y < board.length; y += 1) {
-    for (let x = 0; x < board[y]!.length; x += 1) {
-      const tile = board[y]![x]!;
-      if (tile.owner === null || componentIds[y]![x] !== null) {
-        continue;
-      }
-
-      const componentId = nextComponentId;
-      nextComponentId += 1;
-
-      let power = 0;
-      const stack: Array<[number, number]> = [[x, y]];
-      componentIds[y]![x] = componentId;
-
-      while (stack.length > 0) {
-        const [currentX, currentY] = stack.pop()!;
-        const currentTile = board[currentY]![currentX]!;
-
-        if (currentTile.origin === "seed") {
-          power += 1;
-        }
-
-        for (const [nextX, nextY] of getNeighborCoordinates(currentX, currentY)) {
-          const neighbor = board[nextY]![nextX]!;
-          if (neighbor.owner !== tile.owner || componentIds[nextY]![nextX] !== null) {
-            continue;
-          }
-
-          componentIds[nextY]![nextX] = componentId;
-          stack.push([nextX, nextY]);
-        }
-      }
-
-      componentPower.set(componentId, power);
-    }
-  }
-
-  return {
-    componentIds,
-    componentPower,
-  };
-}
-
-function determineClaimWinner(
-  claim: TileClaim,
-  componentPower: Map<number, number>,
-): PlayerSeat | null {
-  let winningSeat: PlayerSeat | null = null;
-  let winningPower = -1;
-  let hasTie = false;
-
-  for (const [seat, componentIds] of claim.bySeat) {
-    let totalPower = 0;
-
-    for (const componentId of componentIds) {
-      totalPower += componentPower.get(componentId) ?? 0;
-    }
-
-    if (totalPower > winningPower) {
-      winningSeat = seat;
-      winningPower = totalPower;
-      hasTie = false;
-      continue;
-    }
-
-    if (totalPower === winningPower) {
-      hasTie = true;
-    }
-  }
-
-  if (hasTie) {
-    return null;
-  }
-
-  return winningSeat;
-}
-
-function clearTile(tile: Tile): void {
-  tile.owner = null;
-  tile.origin = null;
-  tile.plantedTick = null;
-  tile.lastGrowthTick = null;
-}
-
-function isBoardFull(board: Tile[][]): boolean {
-  return board.every((row) => row.every((tile) => tile.terrain === "wall" || tile.owner !== null));
-}
-
 function determineWinner(snapshot: MatchSnapshot): MatchWinner {
   const player1Count = snapshot.players.player1.occupiedTiles;
   const player2Count = snapshot.players.player2.occupiedTiles;
@@ -503,23 +350,4 @@ function determineWinner(snapshot: MatchSnapshot): MatchWinner {
   }
 
   return player1Count > player2Count ? "player1" : "player2";
-}
-
-function otherSeat(seat: PlayerSeat): PlayerSeat {
-  return seat === "player1" ? "player2" : "player1";
-}
-
-function isInsideBoard(x: number, y: number): boolean {
-  return x >= 0 && x < GRID_WIDTH && y >= 0 && y < GRID_HEIGHT;
-}
-
-function getNeighborCoordinates(x: number, y: number): Array<[number, number]> {
-  const neighbors: Array<[number, number]> = [
-    [x, y - 1],
-    [x + 1, y],
-    [x, y + 1],
-    [x - 1, y],
-  ];
-
-  return neighbors.filter(([nextX, nextY]) => isInsideBoard(nextX, nextY));
 }

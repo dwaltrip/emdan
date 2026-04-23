@@ -1,6 +1,7 @@
 import WebSocket from "ws";
 
-import { Match, type AssignedClientConnection, type ClientConnection } from "./match.ts";
+import type { AssignedClientConnection, ClientConnection } from "./connection.ts";
+import { Match } from "../game/match.ts";
 import {
   type ClientMessage,
   type ServerMessage,
