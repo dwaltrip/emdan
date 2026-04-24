@@ -181,10 +181,16 @@ function createBlobWarsBoardStore(width: number, height: number) {
     // won't reach it, and it will freeze on stale data. Safe only when the
     // board is keyed by matchId (React remounts Tiles before the next paint);
     // do not call reset on a live, un-keyed board.
+    //
+    // Only the `game` substate is reset. connectionStatus and UI state are
+    // session-level and survive match transitions.
     reset(newWidth: number = width, newHeight: number = height): void {
       tileCache.clear();
       tileSubs.clear();
-      store.reset(createDefaultInputState(newWidth, newHeight));
+      store.reset({
+        ...store.state,
+        game: createDefaultGameState(newWidth, newHeight),
+      });
     },
   };
 }
