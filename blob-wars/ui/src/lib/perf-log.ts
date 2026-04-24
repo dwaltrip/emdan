@@ -37,6 +37,10 @@ function formatTickLine(key: string | number, events: RecorderEvent[]): void {
     const v = byName.get(name)?.data?.[k];
     return typeof v === 'string' || typeof v === 'number' ? String(v) : '?';
   };
+  const numField = (name: string, k: string): string => {
+    const v = byName.get(name)?.data?.[k];
+    return typeof v === 'number' ? v.toFixed(1) : '?';
+  };
 
   const now = performance.now();
   const delta = lastLogAt === null ? 0 : now - lastLogAt;
@@ -48,7 +52,10 @@ function formatTickLine(key: string | number, events: RecorderEvent[]): void {
       `tick=${key} ` +
       `wsRecv→pipeStart=${gap('wsRecv', 'pipeStart')} ` +
       `derive=${dur('derive')} diff=${dur('diff')} ` +
-      `pipeEnd→paint=${gap('pipeEnd', 'paint')}ms ` +
+      `pipeEnd→commit=${gap('pipeEnd', 'reactCommit')} ` +
+      `commit=${numField('reactCommit', 'ms')}/${numField('reactCommit', 'base')} ` +
+      `commit→paint=${gap('reactCommit', 'paint')} ` +
+      `wsRecv→paint=${gap('wsRecv', 'paint')}ms ` +
       `changed=${field('pipeEnd', 'changed')}/${field('pipeEnd', 'total')} ` +
       `occupied=+${field('pipeEnd', 'newlyOccupied')} ` +
       `tileRenders=${tileRenders}`,
@@ -70,6 +77,47 @@ const recorder = createRecorder({
 
 function rAFEvent(name: string, key: string | number): void {
   requestAnimationFrame(() => recorder.event(name, key));
+}
+
+// --- Responsiveness monitors ---
+
+const FRAME_DRIFT_THRESHOLD_MS = 10;
+const FRAME_BUDGET_MS = 16.67;
+
+function startLongTaskObserver(): void {
+  if (typeof PerformanceObserver === 'undefined') return;
+  try {
+    const observer = new PerformanceObserver((list) => {
+      for (const entry of list.getEntries()) {
+        console.warn(
+          `[longtask] ${entry.duration.toFixed(1)}ms at +${entry.startTime.toFixed(0)}`,
+        );
+      }
+    });
+    observer.observe({ entryTypes: ['longtask'] });
+  } catch {
+    // longtask entry type not supported; silently skip.
+  }
+}
+
+function startFrameDriftMonitor(): void {
+  if (typeof requestAnimationFrame === 'undefined') return;
+  let last = performance.now();
+  function frame(): void {
+    const now = performance.now();
+    const drift = now - last - FRAME_BUDGET_MS;
+    if (drift > FRAME_DRIFT_THRESHOLD_MS) {
+      console.warn(`[frame] drift=${drift.toFixed(1)}ms at +${now.toFixed(0)}`);
+    }
+    last = now;
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+}
+
+if (typeof window !== 'undefined') {
+  startLongTaskObserver();
+  startFrameDriftMonitor();
 }
 
 const perfLog = {
