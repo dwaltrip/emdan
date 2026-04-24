@@ -1,7 +1,7 @@
 import type { MatchSnapshot } from '@shared/protocol';
 
 import type { BlobWarsBoardStoreInstance } from './board-store';
-import type { BlobWarsInputState } from './types';
+import type { BlobWarsInputState, ConnectionStatus } from './types';
 
 function createActions(store: BlobWarsBoardStoreInstance) {
   return {
@@ -14,6 +14,12 @@ function createActions(store: BlobWarsBoardStoreInstance) {
         state.game.phase = snapshot.phase;
         state.game.currentTurn = snapshot.currentTurn;
         state.game.players = snapshot.players;
+        state.game.currentUser = snapshot.currentUser;
+      },
+    ),
+    setConnectionStatus: store.makeAction(
+      (state: BlobWarsInputState, status: ConnectionStatus) => {
+        state.connectionStatus = status;
       },
     ),
   };

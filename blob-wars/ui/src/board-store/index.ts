@@ -2,6 +2,7 @@ export type {
   BlobWarsInputState,
   BlobWarsSourceState,
   BlobWarsState,
+  ConnectionStatus,
   Coord,
   CoordKey,
   DerivedState,

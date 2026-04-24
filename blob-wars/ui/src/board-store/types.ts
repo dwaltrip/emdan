@@ -4,6 +4,8 @@ type PlayerId = PlayerSeat;
 
 type CoordKey = string;
 
+type ConnectionStatus = 'disconnected' | 'connecting' | 'connected';
+
 interface Coord {
   x: number;
   y: number;
@@ -19,6 +21,7 @@ interface BlobWarsSourceState {
   phase: MatchPhase;
   currentTurn: PlayerSeat | null;
   players: Record<PlayerSeat, PlayerState>;
+  currentUser: { seat: PlayerSeat | null };
 }
 
 // Seam: kept for future client-side UI state (selection, drag, modals, etc).
@@ -28,6 +31,7 @@ interface UIState {}
 interface BlobWarsInputState {
   game: BlobWarsSourceState;
   ui: UIState;
+  connectionStatus: ConnectionStatus;
 }
 
 interface DerivedState {
@@ -51,6 +55,7 @@ interface TileData {
 export type {
   PlayerId,
   CoordKey,
+  ConnectionStatus,
   Coord,
   TileSource,
   BlobWarsSourceState,

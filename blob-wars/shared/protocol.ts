@@ -42,6 +42,7 @@ export interface MatchSnapshot {
   currentTurn: PlayerSeat | null;
   board: BoardState;
   players: Record<PlayerSeat, PlayerState>;
+  currentUser: { seat: PlayerSeat | null };
 }
 
 export interface JoinLobbyMessage {
@@ -62,6 +63,7 @@ export type ClientMessage = JoinLobbyMessage | PlantSeedMessage | PingMessage;
 
 export interface WelcomeMessage {
   type: "welcome";
+  // TODO: use for pre-match "waiting for opponent" message, or remove.
   seat: PlayerSeat;
 }
 
@@ -241,8 +243,13 @@ function isMatchSnapshot(value: unknown): value is MatchSnapshot {
     isMatchPhase(value.phase) &&
     (value.currentTurn === null || isPlayerSeat(value.currentTurn)) &&
     isBoardState(value.board) &&
-    isPlayersRecord(value.players)
+    isPlayersRecord(value.players) &&
+    isCurrentUser(value.currentUser)
   );
+}
+
+function isCurrentUser(value: unknown): value is { seat: PlayerSeat | null } {
+  return isRecord(value) && (value.seat === null || isPlayerSeat(value.seat));
 }
 
 function isMatchPhase(value: unknown): value is MatchPhase {

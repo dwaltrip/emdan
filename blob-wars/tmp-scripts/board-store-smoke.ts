@@ -32,6 +32,7 @@ function snapshotOf(tiles: TileState[][], tick = 0): MatchSnapshot {
       player1: { connected: true, occupiedTiles: 0, seedsRemaining: 0 },
       player2: { connected: true, occupiedTiles: 0, seedsRemaining: 0 },
     },
+    currentUser: { seat: null },
   };
 }
 

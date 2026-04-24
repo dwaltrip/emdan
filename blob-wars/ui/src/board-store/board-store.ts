@@ -22,6 +22,7 @@ import type {
   BlobWarsInputState,
   BlobWarsSourceState,
   BlobWarsState,
+  ConnectionStatus,
   Coord,
   CoordKey,
   DerivedState,
@@ -58,6 +59,7 @@ function createDefaultGameState(width: number, height: number): BlobWarsSourceSt
       player1: createDefaultPlayerState(),
       player2: createDefaultPlayerState(),
     },
+    currentUser: { seat: null },
   };
 }
 
@@ -65,10 +67,13 @@ function createDefaultUIState(): UIState {
   return {};
 }
 
+const DEFAULT_CONNECTION_STATUS: ConnectionStatus = 'disconnected';
+
 function createDefaultInputState(width: number, height: number): BlobWarsInputState {
   return {
     game: createDefaultGameState(width, height),
     ui: createDefaultUIState(),
+    connectionStatus: DEFAULT_CONNECTION_STATUS,
   };
 }
 

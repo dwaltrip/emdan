@@ -42,7 +42,7 @@ export class Match {
     this.sendToAll((seat) => ({
       type: "matchStarted",
       seat,
-      state: this.toSnapshot(),
+      state: this.buildSnapshotFor(seat),
     }));
   }
 
@@ -122,17 +122,17 @@ export class Match {
       this.timer = null;
     }
 
-    this.sendToAll({
+    this.sendToAll((seat) => ({
       type: "matchEnded",
       reason,
       winner,
-      state: this.toSnapshot(),
-    });
+      state: this.buildSnapshotFor(seat),
+    }));
 
     this.onEnded();
   }
 
-  private toSnapshot(): MatchSnapshot {
+  private buildSnapshotFor(seat: PlayerSeat): MatchSnapshot {
     const gs = this.engine.toSnapshot();
 
     return {
@@ -148,14 +148,15 @@ export class Match {
         player1: { connected: this.isConnected("player1"), ...gs.seats.player1 },
         player2: { connected: this.isConnected("player2"), ...gs.seats.player2 },
       },
+      currentUser: { seat },
     };
   }
 
   private broadcastState(): void {
-    this.sendToAll({
+    this.sendToAll((seat) => ({
       type: "stateUpdate",
-      state: this.toSnapshot(),
-    });
+      state: this.buildSnapshotFor(seat),
+    }));
   }
 
   private sendToAll(message: ServerMessage | ((seat: PlayerSeat) => ServerMessage)): void {
