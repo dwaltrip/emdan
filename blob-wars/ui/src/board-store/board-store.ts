@@ -49,6 +49,7 @@ function createDefaultPlayerState(): PlayerState {
 
 function createDefaultGameState(width: number, height: number): BlobWarsSourceState {
   return {
+    matchId: null,
     width,
     height,
     tiles: createEmptyTiles(width, height),
@@ -67,7 +68,9 @@ function createDefaultUIState(): UIState {
   return {};
 }
 
-const DEFAULT_CONNECTION_STATUS: ConnectionStatus = 'disconnected';
+// Default to 'connecting' because session-instance opens the socket at import
+// time, before any onOpen/onClose callback can update the status.
+const DEFAULT_CONNECTION_STATUS: ConnectionStatus = 'connecting';
 
 function createDefaultInputState(width: number, height: number): BlobWarsInputState {
   return {
@@ -173,8 +176,11 @@ function createBlobWarsBoardStore(width: number, height: number) {
       return tileCache.get(serializeCoord(coord)) ?? createDefaultTileData(coord);
     },
 
-    // Assumes components have unmounted before reset. If you keep the board
-    // mounted across resets, force remount via a React `key` on the container.
+    // Reset clears tileCache AND tileSubs. Any Tile still mounted after a reset
+    // holds a subscription into an orphaned Set — runPipeline's notifications
+    // won't reach it, and it will freeze on stale data. Safe only when the
+    // board is keyed by matchId (React remounts Tiles before the next paint);
+    // do not call reset on a live, un-keyed board.
     reset(newWidth: number = width, newHeight: number = height): void {
       tileCache.clear();
       tileSubs.clear();

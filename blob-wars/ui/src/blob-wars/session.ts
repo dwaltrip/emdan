@@ -18,6 +18,7 @@ interface BlobWarsSession {
   handleClose: () => void;
   plant: (x: number, y: number) => void;
   canPlant: () => boolean;
+  joinLobby: () => void;
 }
 
 function createBlobWarsSession({ store, send }: SessionDeps): BlobWarsSession {
@@ -59,6 +60,10 @@ function createBlobWarsSession({ store, send }: SessionDeps): BlobWarsSession {
     send({ type: 'plantSeed', x, y });
   }
 
+  function joinLobby(): void {
+    send({ type: 'joinLobby' });
+  }
+
   function canPlant(): boolean {
     const { game, connectionStatus } = store.state;
     const seat = game.currentUser.seat;
@@ -76,6 +81,7 @@ function createBlobWarsSession({ store, send }: SessionDeps): BlobWarsSession {
     handleClose,
     plant,
     canPlant,
+    joinLobby,
   };
 }
 

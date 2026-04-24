@@ -7,6 +7,7 @@ function createActions(store: BlobWarsBoardStoreInstance) {
   return {
     applySnapshot: store.makeAction(
       (state: BlobWarsInputState, snapshot: MatchSnapshot) => {
+        state.game.matchId = snapshot.matchId;
         state.game.width = snapshot.board.width;
         state.game.height = snapshot.board.height;
         state.game.tiles = snapshot.board.tiles;
@@ -14,7 +15,11 @@ function createActions(store: BlobWarsBoardStoreInstance) {
         state.game.phase = snapshot.phase;
         state.game.currentTurn = snapshot.currentTurn;
         state.game.players = snapshot.players;
-        state.game.currentUser = snapshot.currentUser;
+        // Preserve reference when seat is unchanged so useCurrentUser bails
+        // via Object.is instead of re-rendering App every tick.
+        if (state.game.currentUser.seat !== snapshot.currentUser.seat) {
+          state.game.currentUser = snapshot.currentUser;
+        }
       },
     ),
     setConnectionStatus: store.makeAction(

@@ -1,80 +1,33 @@
-import { useEffect, useMemo } from "react";
+import { useSyncExternalStore } from "react";
 
-import {
-  GRID_HEIGHT,
-  GRID_WIDTH,
-} from "@shared/protocol";
+import type { PlayerSeat } from "@shared/protocol";
+import { GRID_HEIGHT, GRID_WIDTH } from "@shared/protocol";
+
 import "./App.css";
+import type { BlobWarsSession } from "./blob-wars/session";
+import { session } from "./blob-wars/session-instance";
+import type { ConnectionStatus, BlobWarsSourceState } from "./board-store";
 import { Board } from "./components/board";
-import { createActions, createBlobWarsBoardStore } from "./board-store";
-import { DebugPanel } from "./components/debug-panel";
-import { useGameSocket } from "./use-game-socket";
-
-const DEFAULT_WS_PORT = import.meta.env.VITE_WS_PORT ?? "3002";
-const DEFAULT_WS_URL = import.meta.env.VITE_WS_URL ?? getDefaultWsUrl(DEFAULT_WS_PORT);
+import { useCurrentUser } from "./hooks/use-current-user";
+import { useMatchId } from "./hooks/use-match-id";
+import { useStatus } from "./hooks/use-status";
 
 function App() {
-  const {
-    status,
-    seat,
-    latestMessage,
-    latestSnapshot,
-    logs,
-    send,
-  } = useGameSocket(DEFAULT_WS_URL);
-
-  const store = useMemo(
-    () => createBlobWarsBoardStore(GRID_WIDTH, GRID_HEIGHT),
-    [],
-  );
-  const actions = useMemo(() => createActions(store), [store]);
-
-  useEffect(() => {
-    if (latestSnapshot) {
-      actions.applySnapshot(latestSnapshot);
-    }
-  }, [latestSnapshot, actions]);
-
-  function plantSeed(x: number, y: number): void {
-    if (seat === null || !latestSnapshot) {
-      return;
-    }
-    if (latestSnapshot.phase !== "placing" || latestSnapshot.currentTurn !== seat) {
-      return;
-    }
-    if (latestSnapshot.players[seat].seedsRemaining <= 0) {
-      return;
-    }
-
-    send({
-      type: "plantSeed",
-      x,
-      y,
-    });
-  }
-
-  const canPlant =
-    status === "connected" &&
-    seat !== null &&
-    latestSnapshot !== null &&
-    latestSnapshot.phase === "placing" &&
-    latestSnapshot.currentTurn === seat &&
-    latestSnapshot.players[seat].seedsRemaining > 0;
+  const status = useStatus(session);
+  const { seat } = useCurrentUser(session);
+  const matchId = useMatchId(session);
 
   if (seat !== null) {
     return (
       <>
-        <main className="app-shell match-shell">
-          {latestSnapshot && <MatchDetails snapshot={latestSnapshot} seat={seat} />}
+        <main className="app-shell">
+          <MatchDetails session={session} />
           <Board
-            store={store}
+            key={matchId}
+            session={session}
             width={GRID_WIDTH}
             height={GRID_HEIGHT}
-            seat={seat}
-            canPlant={canPlant}
-            onPlant={plantSeed}
           />
-          <DebugPanel latestMessage={latestMessage} logs={logs} />
         </main>
         <StatusBar status={status} />
       </>
@@ -87,13 +40,11 @@ function App() {
         <section className="hero-panel">
           <h1 className="hero-title">Blob Wars</h1>
           {status === "connected" && (
-            <button onClick={() => send({ type: "joinLobby" })}>
+            <button onClick={() => session.joinLobby()}>
               Join lobby
             </button>
           )}
         </section>
-
-        <DebugPanel latestMessage={latestMessage} logs={logs} />
       </main>
       <StatusBar status={status} />
     </>
@@ -101,7 +52,7 @@ function App() {
 }
 
 interface StatusBarProps {
-  status: "connected" | "connecting" | "disconnected";
+  status: ConnectionStatus;
 }
 
 function StatusBar({ status }: StatusBarProps) {
@@ -121,29 +72,36 @@ function StatusBar({ status }: StatusBarProps) {
 }
 
 interface MatchDetailsProps {
-  snapshot: NonNullable<ReturnType<typeof useGameSocket>["latestSnapshot"]>;
-  seat: NonNullable<ReturnType<typeof useGameSocket>["seat"]>;
+  session: BlobWarsSession;
 }
 
-function MatchDetails({ snapshot, seat }: MatchDetailsProps) {
+function MatchDetails({ session }: MatchDetailsProps) {
+  // Subscribe to every store change; this component intentionally re-renders
+  // per tick. Returns the version primitive so React's dev warning about an
+  // unstable getSnapshot result doesn't fire.
+  useSyncExternalStore(session.store.subscribe, () => session.store.version);
+  const { game } = session.store.state;
+  const seat = game.currentUser.seat;
+  if (seat === null) return null;
+
   return (
     <div className="match-details">
       <div className="match-meta">
-        <span>Match: {snapshot.matchId}</span>
-        <span>Tick: {snapshot.tick}</span>
-        <span>{describePhase(snapshot, seat)}</span>
+        <span>Match: {game.matchId}</span>
+        <span>Tick: {game.tick}</span>
+        <span>{describePhase(game, seat)}</span>
       </div>
       <div className="player-cards">
         <PlayerCard
           label="Player 1"
-          tiles={snapshot.players.player1.occupiedTiles}
-          seeds={snapshot.players.player1.seedsRemaining}
+          tiles={game.players.player1.occupiedTiles}
+          seeds={game.players.player1.seedsRemaining}
           isYou={seat === "player1"}
         />
         <PlayerCard
           label="Player 2"
-          tiles={snapshot.players.player2.occupiedTiles}
-          seeds={snapshot.players.player2.seedsRemaining}
+          tiles={game.players.player2.occupiedTiles}
+          seeds={game.players.player2.seedsRemaining}
           isYou={seat === "player2"}
         />
       </div>
@@ -151,15 +109,12 @@ function MatchDetails({ snapshot, seat }: MatchDetailsProps) {
   );
 }
 
-function describePhase(
-  snapshot: MatchDetailsProps["snapshot"],
-  seat: MatchDetailsProps["seat"],
-): string {
-  if (snapshot.phase === "placing") {
-    if (snapshot.currentTurn === seat) return "Your turn to place a seed";
+function describePhase(game: BlobWarsSourceState, seat: PlayerSeat): string {
+  if (game.phase === "placing") {
+    if (game.currentTurn === seat) return "Your turn to place a seed";
     return "Opponent placing…";
   }
-  if (snapshot.phase === "simulating") return "Simulating…";
+  if (game.phase === "simulating") return "Simulating…";
   return "Match ended";
 }
 
@@ -180,15 +135,6 @@ function PlayerCard({ label, tiles, seeds, isYou }: PlayerCardProps) {
       </span>
     </div>
   );
-}
-
-function getDefaultWsUrl(port: string): string {
-  if (typeof window === "undefined") {
-    return `ws://localhost:${port}`;
-  }
-
-  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  return `${protocol}//${window.location.hostname}:${port}`;
 }
 
 export default App;

@@ -1,21 +1,23 @@
+import { memo } from "react";
 import clsx from "clsx";
 
 import type { BlobWarsBoardStoreInstance } from "@/board-store";
-import { useTileData } from "@/board-store";
+import type { BlobWarsSession } from "@/blob-wars/session";
+import { useCanPlant } from "@/hooks/use-can-plant";
+import { useTileData } from "@/hooks/use-tile-data";
 import { perfLog } from "@/lib/perf-log";
-import type { PlayerSeat } from "@shared/protocol";
 import "./board.css";
 
 interface BoardProps {
-  store: BlobWarsBoardStoreInstance;
+  session: BlobWarsSession;
   width: number;
   height: number;
-  seat: PlayerSeat | null;
-  canPlant: boolean;
-  onPlant: (x: number, y: number) => void;
 }
 
-export function Board({ store, width, height, seat, canPlant, onPlant }: BoardProps) {
+export const Board = memo(function Board({ session, width, height }: BoardProps) {
+  const canPlant = useCanPlant(session);
+  const seat = session.store.state.game.currentUser.seat;
+
   const cells: { x: number; y: number }[] = [];
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
@@ -31,26 +33,26 @@ export function Board({ store, width, height, seat, canPlant, onPlant }: BoardPr
       {cells.map(({ x, y }) => (
         <Tile
           key={`${x}-${y}`}
-          store={store}
+          store={session.store}
           x={x}
           y={y}
           canPlant={canPlant}
-          onPlant={onPlant}
+          plant={session.plant}
         />
       ))}
     </div>
   );
-}
+});
 
 interface TileProps {
   store: BlobWarsBoardStoreInstance;
   x: number;
   y: number;
   canPlant: boolean;
-  onPlant: (x: number, y: number) => void;
+  plant: (x: number, y: number) => void;
 }
 
-function Tile({ store, x, y, canPlant, onPlant }: TileProps) {
+const Tile = memo(function Tile({ store, x, y, canPlant, plant }: TileProps) {
   perfLog.bumpTileRender();
   const tile = useTileData(store, { x, y });
   const isWall = tile.terrain === "wall";
@@ -69,7 +71,7 @@ function Tile({ store, x, y, canPlant, onPlant }: TileProps) {
         ],
         disabled && "tile-disabled",
       )}
-      onClick={disabled ? undefined : () => onPlant(x, y)}
+      onClick={disabled ? undefined : () => plant(x, y)}
     />
   );
-}
+});

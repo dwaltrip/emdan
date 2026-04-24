@@ -14,6 +14,7 @@ interface Coord {
 type TileSource = TileState;
 
 interface BlobWarsSourceState {
+  matchId: string | null;
   width: number;
   height: number;
   tiles: TileSource[][];
