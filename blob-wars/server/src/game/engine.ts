@@ -130,7 +130,9 @@ export class GameEngine {
       this.expandSeeds();
     }
 
-    if (isBoardFull(this.board)) {
+    const counts = countTiles(this.board);
+    const eliminated = counts.player1 === 0 || counts.player2 === 0;
+    if (eliminated || isBoardFull(this.board)) {
       this.phaseState = "ended";
       return { phaseChanged: "ended" };
     }
