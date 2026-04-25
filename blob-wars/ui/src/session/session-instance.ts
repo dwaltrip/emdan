@@ -7,10 +7,8 @@ const DEFAULT_WS_URL = import.meta.env.VITE_WS_URL ?? getDefaultWsUrl(DEFAULT_WS
 
 // NOTE: intentional import-time side effect. The session is a module-level
 // singleton that owns its own socket and outlives any React mount — the whole
-// point of the perf refactor. HMR dispose tears down the old socket before
-// the module is replaced; without it dev reloads would pile up phantom
-// connections. Non-browser importers (tests, node scripts) should import
-// `session.ts` / `game-socket.ts` directly instead of this file.
+// point of the perf refactor. Non-browser importers (tests, node scripts)
+// should import `session.ts` / `game-socket.ts` directly instead of this file.
 const handle = initSession(DEFAULT_WS_URL);
 
 perfLog.setContextProvider(() => {
@@ -23,6 +21,8 @@ perfLog.setContextProvider(() => {
 });
 
 if (import.meta.hot) {
+  // HMR dispose tears down the old socket before the module is replaced;
+  // without it dev reloads would pile up phantom connections.
   import.meta.hot.dispose(() => handle.end());
 }
 
