@@ -13,7 +13,7 @@ export function HomeContent({ session, status }: HomeContentProps) {
     <section className="hero-panel">
       <h1 className="hero-title">Blob Wars</h1>
       {status === "connected" && (
-        <button onClick={() => session.joinLobby()}>
+        <button className="join-lobby-button" onClick={() => session.joinLobby()}>
           Join lobby
         </button>
       )}

@@ -12,3 +12,21 @@
   font-size: 40px;
   letter-spacing: 0.01em;
 }
+
+.join-lobby-button {
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 12px 14px;
+  color: var(--text-h);
+  background: var(--accent-bg);
+  cursor: pointer;
+  font: inherit;
+  transition:
+    transform 120ms ease,
+    border-color 120ms ease;
+}
+
+.join-lobby-button:hover {
+  border-color: var(--accent-border);
+  transform: translateY(-1px);
+}
