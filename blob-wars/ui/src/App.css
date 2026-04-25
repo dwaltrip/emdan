@@ -3,13 +3,14 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: 32px;
 }
 
-.app-shell-pre-match {
-  align-items: center;
-  justify-content: center;
-  gap: 32px;
+.app-content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 32px;
 }
 
 .panel {
@@ -26,8 +27,10 @@
 }
 
 .hero-panel {
+  flex: 1;
   display: grid;
   gap: 20px;
+  place-content: center;
   justify-items: center;
   text-align: center;
 }
@@ -151,7 +154,7 @@ button:disabled {
 }
 
 @media (max-width: 900px) {
-  .app-shell {
+  .app-content {
     padding: 16px;
   }
 }

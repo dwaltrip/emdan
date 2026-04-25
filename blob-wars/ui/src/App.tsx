@@ -18,39 +18,34 @@ function App() {
   const { seat } = useCurrentUser(session);
   const matchId = useMatchId(session);
 
-  if (seat !== null) {
-    return (
-      <>
-        <main className="app-shell">
-          <MatchDetails session={session} />
-          <BoardProfiler>
-            <Board
-              key={matchId}
-              session={session}
-              width={GRID_WIDTH}
-              height={GRID_HEIGHT}
-            />
-          </BoardProfiler>
-        </main>
-        <StatusBar status={status} />
-      </>
-    );
-  }
-
   return (
-    <>
-      <main className="app-shell app-shell-pre-match">
-        <section className="hero-panel">
-          <h1 className="hero-title">Blob Wars</h1>
-          {status === "connected" && (
-            <button onClick={() => session.joinLobby()}>
-              Join lobby
-            </button>
-          )}
-        </section>
-      </main>
+    <main className="app-shell">
+      <div className="app-content">
+        {seat !== null ? (
+          <>
+            <MatchDetails session={session} />
+            <BoardProfiler>
+              <Board
+                key={matchId}
+                session={session}
+                width={GRID_WIDTH}
+                height={GRID_HEIGHT}
+              />
+            </BoardProfiler>
+          </>
+        ) : (
+          <section className="hero-panel">
+            <h1 className="hero-title">Blob Wars</h1>
+            {status === "connected" && (
+              <button onClick={() => session.joinLobby()}>
+                Join lobby
+              </button>
+            )}
+          </section>
+        )}
+      </div>
       <StatusBar status={status} />
-    </>
+    </main>
   );
 }
 
