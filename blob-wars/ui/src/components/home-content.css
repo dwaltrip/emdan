@@ -1,0 +1,14 @@
+.hero-panel {
+  flex: 1;
+  display: grid;
+  gap: 20px;
+  place-content: center;
+  justify-items: center;
+  text-align: center;
+}
+
+.hero-title {
+  margin: 0;
+  font-size: 40px;
+  letter-spacing: 0.01em;
+}
