@@ -4,8 +4,8 @@ import type { PlayerSeat } from "@shared/protocol";
 import { GRID_HEIGHT, GRID_WIDTH } from "@shared/protocol";
 
 import "./App.css";
-import type { BlobWarsSession } from "./blob-wars/session";
-import { session } from "./blob-wars/session-instance";
+import type { BlobWarsSession } from "./session/session";
+import { session } from "./session/session-instance";
 import type { ConnectionStatus, BlobWarsSourceState } from "./board-store";
 import { Board } from "./components/board";
 import { useCurrentUser } from "./hooks/use-current-user";

@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react';
 
 import type { PlayerSeat } from '@shared/protocol';
-import type { BlobWarsSession } from '@/blob-wars/session';
+import type { BlobWarsSession } from '@/session/session';
 
 function useCurrentUser(session: BlobWarsSession): { seat: PlayerSeat | null } {
   return useSyncExternalStore(

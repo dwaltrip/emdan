@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react';
 
-import type { BlobWarsSession } from '@/blob-wars/session';
+import type { BlobWarsSession } from '@/session/session';
 
 function useCanPlant(session: BlobWarsSession): boolean {
   return useSyncExternalStore(

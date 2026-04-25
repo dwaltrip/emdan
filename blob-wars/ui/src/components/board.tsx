@@ -2,7 +2,7 @@ import { memo } from "react";
 import clsx from "clsx";
 
 import type { BlobWarsBoardStoreInstance } from "@/board-store";
-import type { BlobWarsSession } from "@/blob-wars/session";
+import type { BlobWarsSession } from "@/session/session";
 import { useCanPlant } from "@/hooks/use-can-plant";
 import { useTileData } from "@/hooks/use-tile-data";
 import { perfLog } from "@/lib/perf-log";
