@@ -1,11 +1,22 @@
 // Domain wiring for blob-wars perf instrumentation.
 //
-// Wires the generic recorder to a single-line formatter, configures `paint`
-// as the closing event, and exposes a narrow callsite API. Replace or
-// augment the formatter without touching call sites or the recorder lib.
+// Wires the generic recorder to a single-line console formatter, configures
+// `paint` as the closing event, and maintains an in-memory structured buffer
+// for offline analysis. Records are dumped as JSON: automatically on
+// matchEnded (wired by the session) and beforeunload, or manually via
+// window.__perfDump().
+//
+// Gated on `?perfDebug` URL param. When absent (default dev), all exported
+// perfLog functions are no-ops and no observers are installed. Required so
+// the measurement apparatus itself doesn't affect hover/render latency
+// during normal development.
 
 import type { RecorderEvent } from './perf-recorder';
 import { createRecorder } from './perf-recorder';
+
+const PERF_DEBUG =
+  typeof window !== 'undefined' &&
+  new URLSearchParams(window.location.search).has('perfDebug');
 
 let lastLogAt: number | null = null;
 let tileRenderCount = 0;
@@ -20,46 +31,190 @@ function drainTileRenders(): number {
   return c;
 }
 
+// --- Structured record buffer ---
+
+interface PerfContext {
+  phase: string | null;
+  matchId: string | null;
+  seat: string | null;
+}
+
+interface BaseRecord {
+  t: number;
+  wallTime: string;
+}
+
+interface TickRecord extends BaseRecord {
+  type: 'tick';
+  tick: number | string;
+  phase: string | null;
+  matchId: string | null;
+  seat: string | null;
+  visibilityState: DocumentVisibilityState | null;
+  hasFocus: boolean | null;
+  wsRecvToPipeStart: number | null;
+  derive: number | null;
+  diff: number | null;
+  pipeEndToCommit: number | null;
+  commitMs: number | null;
+  commitBase: number | null;
+  commitToPaint: number | null;
+  wsRecvToPaint: number | null;
+  changed: number | null;
+  total: number | null;
+  newlyOccupied: number | null;
+  tileRenders: number;
+}
+
+interface LongTaskRecord extends BaseRecord {
+  type: 'longtask';
+  durationMs: number;
+  startTime: number;
+}
+
+interface FrameDriftRecord extends BaseRecord {
+  type: 'frameDrift';
+  driftMs: number;
+}
+
+interface VisibilityRecord extends BaseRecord {
+  type: 'visibility' | 'focus' | 'blur';
+  visibilityState: DocumentVisibilityState;
+  hasFocus: boolean;
+}
+
+interface MarkerRecord extends BaseRecord {
+  type: 'marker';
+  reason: string;
+}
+
+type PerfRecord =
+  | TickRecord
+  | LongTaskRecord
+  | FrameDriftRecord
+  | VisibilityRecord
+  | MarkerRecord;
+
+const BUFFER_CAP = 1000;
+const records: PerfRecord[] = [];
+let bufferCapWarned = false;
+
+function pushRecord(rec: PerfRecord): void {
+  if (records.length >= BUFFER_CAP) {
+    if (!bufferCapWarned) {
+      console.warn(`[perfLog] buffer cap (${BUFFER_CAP}) reached; dropping new records`);
+      bufferCapWarned = true;
+    }
+    return;
+  }
+  records.push(rec);
+}
+
+let contextProvider: (() => PerfContext) | null = null;
+
+function setContextProvider(fn: () => PerfContext): void {
+  contextProvider = fn;
+}
+
+function getContext(): PerfContext {
+  if (!contextProvider) return { phase: null, matchId: null, seat: null };
+  try {
+    return contextProvider();
+  } catch {
+    return { phase: null, matchId: null, seat: null };
+  }
+}
+
+function getVisibility(): { visibilityState: DocumentVisibilityState | null; hasFocus: boolean | null } {
+  if (typeof document === 'undefined') return { visibilityState: null, hasFocus: null };
+  return { visibilityState: document.visibilityState, hasFocus: document.hasFocus() };
+}
+
+// --- Tick log + structured tick record ---
+
 function formatTickLine(key: string | number, events: RecorderEvent[]): void {
   const byName = new Map(events.map((e) => [e.name, e]));
 
-  const gap = (a: string, b: string): string => {
+  const gapMs = (a: string, b: string): number | null => {
     const ea = byName.get(a);
     const eb = byName.get(b);
-    if (!ea || !eb) return '?';
-    return (eb.at - ea.at).toFixed(1);
+    if (!ea || !eb) return null;
+    return eb.at - ea.at;
   };
-  const dur = (name: string): string => {
-    const e = byName.get(name);
-    return e?.dur !== undefined ? e.dur.toFixed(1) : '?';
-  };
-  const field = (name: string, k: string): string => {
+  const durMs = (name: string): number | null => byName.get(name)?.dur ?? null;
+  const numField = (name: string, k: string): number | null => {
     const v = byName.get(name)?.data?.[k];
-    return typeof v === 'string' || typeof v === 'number' ? String(v) : '?';
+    return typeof v === 'number' ? v : null;
   };
-  const numField = (name: string, k: string): string => {
+  const strOrNumField = (name: string, k: string): number | null => {
     const v = byName.get(name)?.data?.[k];
-    return typeof v === 'number' ? v.toFixed(1) : '?';
+    if (typeof v === 'number') return v;
+    if (typeof v === 'string') {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : null;
+    }
+    return null;
   };
+
+  const fmt = (v: number | null, digits = 1): string =>
+    v === null ? '?' : v.toFixed(digits);
 
   const now = performance.now();
   const delta = lastLogAt === null ? 0 : now - lastLogAt;
   lastLogAt = now;
   const tileRenders = drainTileRenders();
 
+  const wsRecvToPipeStart = gapMs('wsRecv', 'pipeStart');
+  const derive = durMs('derive');
+  const diff = durMs('diff');
+  const pipeEndToCommit = gapMs('pipeEnd', 'reactCommit');
+  const commitMs = numField('reactCommit', 'ms');
+  const commitBase = numField('reactCommit', 'base');
+  const commitToPaint = gapMs('reactCommit', 'paint');
+  const wsRecvToPaint = gapMs('wsRecv', 'paint');
+  const changed = strOrNumField('pipeEnd', 'changed');
+  const total = strOrNumField('pipeEnd', 'total');
+  const newlyOccupied = strOrNumField('pipeEnd', 'newlyOccupied');
+
   console.log(
     `[${formatTimestamp(new Date())} +${delta.toFixed(0).padStart(4, ' ')}ms] ` +
       `tick=${key} ` +
-      `wsRecv→pipeStart=${gap('wsRecv', 'pipeStart')} ` +
-      `derive=${dur('derive')} diff=${dur('diff')} ` +
-      `pipeEnd→commit=${gap('pipeEnd', 'reactCommit')} ` +
-      `commit=${numField('reactCommit', 'ms')}/${numField('reactCommit', 'base')} ` +
-      `commit→paint=${gap('reactCommit', 'paint')} ` +
-      `wsRecv→paint=${gap('wsRecv', 'paint')}ms ` +
-      `changed=${field('pipeEnd', 'changed')}/${field('pipeEnd', 'total')} ` +
-      `occupied=+${field('pipeEnd', 'newlyOccupied')} ` +
+      `wsRecv→pipeStart=${fmt(wsRecvToPipeStart)} ` +
+      `derive=${fmt(derive)} diff=${fmt(diff)} ` +
+      `pipeEnd→commit=${fmt(pipeEndToCommit)} ` +
+      `commit=${fmt(commitMs)}/${fmt(commitBase)} ` +
+      `commit→paint=${fmt(commitToPaint)} ` +
+      `wsRecv→paint=${fmt(wsRecvToPaint)}ms ` +
+      `changed=${changed ?? '?'}/${total ?? '?'} ` +
+      `occupied=+${newlyOccupied ?? '?'} ` +
       `tileRenders=${tileRenders}`,
   );
+
+  const ctx = getContext();
+  const vis = getVisibility();
+  pushRecord({
+    type: 'tick',
+    t: now,
+    wallTime: new Date().toISOString(),
+    tick: key,
+    phase: ctx.phase,
+    matchId: ctx.matchId,
+    seat: ctx.seat,
+    visibilityState: vis.visibilityState,
+    hasFocus: vis.hasFocus,
+    wsRecvToPipeStart,
+    derive,
+    diff,
+    pipeEndToCommit,
+    commitMs,
+    commitBase,
+    commitToPaint,
+    wsRecvToPaint,
+    changed,
+    total,
+    newlyOccupied,
+    tileRenders,
+  });
 }
 
 function formatTimestamp(d: Date): string {
@@ -89,9 +244,16 @@ function startLongTaskObserver(): void {
   try {
     const observer = new PerformanceObserver((list) => {
       for (const entry of list.getEntries()) {
-        console.warn(
-          `[longtask] ${entry.duration.toFixed(1)}ms at +${entry.startTime.toFixed(0)}`,
-        );
+        // Buffer-only: console.warn during a longtask can amplify the very
+        // jank we're measuring (DevTools retains the buffer even when
+        // closed). Inspect longtasks via the dumped JSON.
+        pushRecord({
+          type: 'longtask',
+          t: performance.now(),
+          wallTime: new Date().toISOString(),
+          durationMs: entry.duration,
+          startTime: entry.startTime,
+        });
       }
     });
     observer.observe({ entryTypes: ['longtask'] });
@@ -107,7 +269,13 @@ function startFrameDriftMonitor(): void {
     const now = performance.now();
     const drift = now - last - FRAME_BUDGET_MS;
     if (drift > FRAME_DRIFT_THRESHOLD_MS) {
-      console.warn(`[frame] drift=${drift.toFixed(1)}ms at +${now.toFixed(0)}`);
+      // Buffer-only for the same reason as longtask above.
+      pushRecord({
+        type: 'frameDrift',
+        t: now,
+        wallTime: new Date().toISOString(),
+        driftMs: drift,
+      });
     }
     last = now;
     requestAnimationFrame(frame);
@@ -115,16 +283,101 @@ function startFrameDriftMonitor(): void {
   requestAnimationFrame(frame);
 }
 
-if (typeof window !== 'undefined') {
-  startLongTaskObserver();
-  startFrameDriftMonitor();
+function startVisibilityMonitor(): void {
+  if (typeof document === 'undefined' || typeof window === 'undefined') return;
+
+  function record(type: 'visibility' | 'focus' | 'blur'): void {
+    const vis = getVisibility();
+    if (vis.visibilityState === null || vis.hasFocus === null) return;
+    pushRecord({
+      type,
+      t: performance.now(),
+      wallTime: new Date().toISOString(),
+      visibilityState: vis.visibilityState,
+      hasFocus: vis.hasFocus,
+    });
+    console.log(`[${type}] visibilityState=${vis.visibilityState} hasFocus=${vis.hasFocus}`);
+  }
+
+  document.addEventListener('visibilitychange', () => record('visibility'));
+  window.addEventListener('focus', () => record('focus'));
+  window.addEventListener('blur', () => record('blur'));
 }
 
-const perfLog = {
-  event: recorder.event,
-  timed: recorder.timed,
-  rAFEvent,
-  bumpTileRender,
+// --- Dump ---
+
+function dump(reason: string): void {
+  if (typeof window === 'undefined') return;
+  if (records.length === 0) return;
+
+  pushRecord({
+    type: 'marker',
+    t: performance.now(),
+    wallTime: new Date().toISOString(),
+    reason,
+  });
+
+  const ctx = getContext();
+  const payload = {
+    reason,
+    dumpedAt: new Date().toISOString(),
+    matchId: ctx.matchId,
+    seat: ctx.seat,
+    bufferCap: BUFFER_CAP,
+    bufferCapHit: bufferCapWarned,
+    recordCount: records.length,
+    records,
+  };
+
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const filename = `perf-${ctx.matchId ?? 'no-match'}-${ctx.seat ?? 'no-seat'}-${stamp}.json`;
+
+  try {
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    console.log(`[perfLog] dumped ${records.length} records to ${filename} (reason=${reason})`);
+  } catch (err) {
+    console.error('[perfLog] dump failed', err);
+  }
+}
+
+if (PERF_DEBUG && typeof window !== 'undefined') {
+  startLongTaskObserver();
+  startFrameDriftMonitor();
+  startVisibilityMonitor();
+  window.addEventListener('beforeunload', () => dump('beforeunload'));
+  // Escape hatch for manual dumps from DevTools.
+  (window as unknown as { __perfDump: (reason?: string) => void }).__perfDump =
+    (reason = 'manual') => dump(reason);
+  console.log('[perfLog] enabled via ?perfDebug');
+}
+
+const noopPerfLog = {
+  event: (_name: string, _key: string | number, _data?: Record<string, unknown>) => {},
+  timed: <T>(_name: string, _key: string | number, fn: () => T): T => fn(),
+  rAFEvent: (_name: string, _key: string | number) => {},
+  bumpTileRender: () => {},
+  setContextProvider: (_fn: () => PerfContext) => {},
+  dump: (_reason: string) => {},
 };
 
-export { perfLog };
+const perfLog = PERF_DEBUG
+  ? {
+      event: recorder.event,
+      timed: recorder.timed,
+      rAFEvent,
+      bumpTileRender,
+      setContextProvider,
+      dump,
+    }
+  : noopPerfLog;
+
+export type { PerfContext, PerfRecord };
+export { perfLog, PERF_DEBUG };

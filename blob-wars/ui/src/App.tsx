@@ -11,7 +11,7 @@ import { Board } from "./components/board";
 import { useCurrentUser } from "./hooks/use-current-user";
 import { useMatchId } from "./hooks/use-match-id";
 import { useStatus } from "./hooks/use-status";
-import { perfLog } from "./lib/perf-log";
+import { PERF_DEBUG, perfLog } from "./lib/perf-log";
 
 function onBoardRender(
   _id: string,
@@ -30,18 +30,25 @@ function App() {
   const matchId = useMatchId(session);
 
   if (seat !== null) {
+    const board = (
+      <Board
+        key={matchId}
+        session={session}
+        width={GRID_WIDTH}
+        height={GRID_HEIGHT}
+      />
+    );
     return (
       <>
         <main className="app-shell">
           <MatchDetails session={session} />
-          <Profiler id="board" onRender={onBoardRender}>
-            <Board
-              key={matchId}
-              session={session}
-              width={GRID_WIDTH}
-              height={GRID_HEIGHT}
-            />
-          </Profiler>
+          {PERF_DEBUG ? (
+            <Profiler id="board" onRender={onBoardRender}>
+              {board}
+            </Profiler>
+          ) : (
+            board
+          )}
         </main>
         <StatusBar status={status} />
       </>

@@ -5,6 +5,7 @@ import type {
 } from '@shared/protocol';
 
 import { createActions, type BlobWarsBoardStoreInstance } from '@/board-store';
+import { perfLog } from '@/lib/perf-log';
 
 interface SessionDeps {
   store: BlobWarsBoardStoreInstance;
@@ -41,8 +42,14 @@ function createBlobWarsSession({ store, send }: SessionDeps): BlobWarsSession {
         return;
       case 'matchStarted':
       case 'stateUpdate':
+        applyIncoming(msg.state);
+        return;
       case 'matchEnded':
         applyIncoming(msg.state);
+        // Auto-dump the perf buffer at match end so the tester gets a JSON
+        // file without DevTools. rAF-deferred to let this final snapshot
+        // flush its `paint` event into the buffer before we serialize.
+        requestAnimationFrame(() => perfLog.dump('matchEnded'));
         return;
     }
   }
