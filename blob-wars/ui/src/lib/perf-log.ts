@@ -352,7 +352,6 @@ if (PERF_DEBUG && typeof window !== 'undefined') {
   startLongTaskObserver();
   startFrameDriftMonitor();
   startVisibilityMonitor();
-  window.addEventListener('beforeunload', () => dump('beforeunload'));
   // Escape hatch for manual dumps from DevTools.
   (window as unknown as { __perfDump: (reason?: string) => void }).__perfDump =
     (reason = 'manual') => dump(reason);

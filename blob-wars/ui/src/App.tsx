@@ -1,4 +1,4 @@
-import { Profiler, useSyncExternalStore } from "react";
+import { useSyncExternalStore } from "react";
 
 import type { PlayerSeat } from "@shared/protocol";
 import { GRID_HEIGHT, GRID_WIDTH } from "@shared/protocol";
@@ -11,18 +11,7 @@ import { Board } from "./components/board";
 import { useCurrentUser } from "./hooks/use-current-user";
 import { useMatchId } from "./hooks/use-match-id";
 import { useStatus } from "./hooks/use-status";
-import { PERF_DEBUG, perfLog } from "./lib/perf-log";
-
-function onBoardRender(
-  _id: string,
-  phase: "mount" | "update" | "nested-update",
-  actualDuration: number,
-  baseDuration: number,
-): void {
-  if (phase === "mount") return;
-  const tick = session.store.state.game.tick;
-  perfLog.event("reactCommit", tick, { ms: actualDuration, base: baseDuration });
-}
+import { BoardProfiler } from "./lib/board-profiler";
 
 function App() {
   const status = useStatus(session);
@@ -30,25 +19,18 @@ function App() {
   const matchId = useMatchId(session);
 
   if (seat !== null) {
-    const board = (
-      <Board
-        key={matchId}
-        session={session}
-        width={GRID_WIDTH}
-        height={GRID_HEIGHT}
-      />
-    );
     return (
       <>
         <main className="app-shell">
           <MatchDetails session={session} />
-          {PERF_DEBUG ? (
-            <Profiler id="board" onRender={onBoardRender}>
-              {board}
-            </Profiler>
-          ) : (
-            board
-          )}
+          <BoardProfiler>
+            <Board
+              key={matchId}
+              session={session}
+              width={GRID_WIDTH}
+              height={GRID_HEIGHT}
+            />
+          </BoardProfiler>
         </main>
         <StatusBar status={status} />
       </>
