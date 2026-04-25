@@ -1,12 +1,12 @@
 import type { MatchSnapshot } from '@shared/protocol';
 
-import type { BlobWarsBoardStoreInstance } from './board-store';
-import type { BlobWarsInputState, ConnectionStatus } from './types';
+import type { BoardStoreInstance } from './board-store';
+import type { InputState, ConnectionStatus } from './types';
 
-function createActions(store: BlobWarsBoardStoreInstance) {
+function createActions(store: BoardStoreInstance) {
   return {
     applySnapshot: store.makeAction(
-      (state: BlobWarsInputState, snapshot: MatchSnapshot) => {
+      (state: InputState, snapshot: MatchSnapshot) => {
         state.game.matchId = snapshot.matchId;
         state.game.width = snapshot.board.width;
         state.game.height = snapshot.board.height;
@@ -23,14 +23,14 @@ function createActions(store: BlobWarsBoardStoreInstance) {
       },
     ),
     setConnectionStatus: store.makeAction(
-      (state: BlobWarsInputState, status: ConnectionStatus) => {
+      (state: InputState, status: ConnectionStatus) => {
         state.connectionStatus = status;
       },
     ),
   };
 }
 
-type BlobWarsActions = ReturnType<typeof createActions>;
+type Actions = ReturnType<typeof createActions>;
 
-export type { BlobWarsActions };
+export type { Actions };
 export { createActions };

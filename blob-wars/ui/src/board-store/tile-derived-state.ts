@@ -1,7 +1,7 @@
 import { serializeCoord } from './coord';
-import type { BlobWarsState, Coord, ExclusionSource, PlayerId, TileData } from './types';
+import type { State, Coord, ExclusionSource, PlayerId, TileData } from './types';
 
-function computeTileData(state: BlobWarsState, coord: Coord): TileData {
+function computeTileData(state: State, coord: Coord): TileData {
   const { game, excludedCoords } = state;
   const tile = game.tiles[coord.y][coord.x];
 

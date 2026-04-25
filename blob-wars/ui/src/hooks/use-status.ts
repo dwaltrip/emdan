@@ -1,9 +1,9 @@
 import { useSyncExternalStore } from 'react';
 
 import type { ConnectionStatus } from '@/board-store';
-import type { BlobWarsSession } from '@/session/session';
+import type { Session } from '@/session/session';
 
-function useStatus(session: BlobWarsSession): ConnectionStatus {
+function useStatus(session: Session): ConnectionStatus {
   return useSyncExternalStore(
     session.store.subscribe,
     () => session.store.state.connectionStatus,

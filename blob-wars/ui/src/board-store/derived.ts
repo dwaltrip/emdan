@@ -2,13 +2,13 @@ import { SEED_EXCLUSION_RADIUS } from '@shared/protocol';
 import { circularNeighborhood } from '@shared/geometry';
 
 import { serializeCoord } from './coord';
-import type { BlobWarsInputState, CoordKey, DerivedState, PlayerId } from './types';
+import type { InputState, CoordKey, DerivedState, PlayerId } from './types';
 
-function deriveBlobWarsState(state: BlobWarsInputState): DerivedState {
+function deriveState(state: InputState): DerivedState {
   return { excludedCoords: computeExcludedCoords(state) };
 }
 
-function computeExcludedCoords(state: BlobWarsInputState): Map<CoordKey, Set<PlayerId>> {
+function computeExcludedCoords(state: InputState): Map<CoordKey, Set<PlayerId>> {
   const excluded = new Map<CoordKey, Set<PlayerId>>();
   if (state.game.phase !== 'placing') return excluded;
 
@@ -31,4 +31,4 @@ function computeExcludedCoords(state: BlobWarsInputState): Map<CoordKey, Set<Pla
   return excluded;
 }
 
-export { deriveBlobWarsState };
+export { deriveState };

@@ -1,7 +1,7 @@
 export type {
-  BlobWarsInputState,
-  BlobWarsSourceState,
-  BlobWarsState,
+  InputState,
+  SourceState,
+  State,
   ConnectionStatus,
   Coord,
   CoordKey,
@@ -12,10 +12,10 @@ export type {
   UIState,
 } from './types';
 
-export type { BlobWarsBoardStoreInstance } from './board-store';
-export { createBlobWarsBoardStore, createDefaultTileData } from './board-store';
+export type { BoardStoreInstance } from './board-store';
+export { createBoardStore, createDefaultTileData } from './board-store';
 
-export type { BlobWarsActions } from './actions';
+export type { Actions } from './actions';
 export { createActions } from './actions';
 
 export { serializeCoord, deserializeCoord, isAdjacent, getNeighbors } from './coord';

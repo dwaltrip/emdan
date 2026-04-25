@@ -1,15 +1,15 @@
 import { memo } from "react";
 import clsx from "clsx";
 
-import type { BlobWarsBoardStoreInstance } from "@/board-store";
-import type { BlobWarsSession } from "@/session/session";
+import type { BoardStoreInstance } from "@/board-store";
+import type { Session } from "@/session/session";
 import { useCanPlant } from "@/hooks/use-can-plant";
 import { useTileData } from "@/hooks/use-tile-data";
 import { perfLog } from "@/lib/perf-log";
 import "./board.css";
 
 interface BoardProps {
-  session: BlobWarsSession;
+  session: Session;
   width: number;
   height: number;
 }
@@ -45,7 +45,7 @@ export const Board = memo(function Board({ session, width, height }: BoardProps)
 });
 
 interface TileProps {
-  store: BlobWarsBoardStoreInstance;
+  store: BoardStoreInstance;
   x: number;
   y: number;
   canPlant: boolean;

@@ -1,8 +1,8 @@
 import { useCallback, useSyncExternalStore } from 'react';
 
-import type { BlobWarsBoardStoreInstance, Coord, TileData } from '@/board-store';
+import type { BoardStoreInstance, Coord, TileData } from '@/board-store';
 
-function useTileData(store: BlobWarsBoardStoreInstance, coord: Coord): TileData {
+function useTileData(store: BoardStoreInstance, coord: Coord): TileData {
   const subscribe = useCallback(
     (cb: () => void) => store.subscribeTile(coord, cb),
     [store, coord.x, coord.y],

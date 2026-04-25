@@ -15,13 +15,13 @@ import { perfLog } from '@/lib/perf-log';
 import type { PlayerState } from '@shared/protocol';
 
 import { serializeCoord } from './coord';
-import { deriveBlobWarsState } from './derived';
+import { deriveState } from './derived';
 import { tilesEqual } from './tile-data';
 import { computeTileData } from './tile-derived-state';
 import type {
-  BlobWarsInputState,
-  BlobWarsSourceState,
-  BlobWarsState,
+  InputState,
+  SourceState,
+  State,
   ConnectionStatus,
   Coord,
   CoordKey,
@@ -47,7 +47,7 @@ function createDefaultPlayerState(): PlayerState {
   return { connected: false, occupiedTiles: 0, seedsRemaining: 0 };
 }
 
-function createDefaultGameState(width: number, height: number): BlobWarsSourceState {
+function createDefaultGameState(width: number, height: number): SourceState {
   return {
     matchId: null,
     width,
@@ -72,7 +72,7 @@ function createDefaultUIState(): UIState {
 // time, before any onOpen/onClose callback can update the status.
 const DEFAULT_CONNECTION_STATUS: ConnectionStatus = 'connecting';
 
-function createDefaultInputState(width: number, height: number): BlobWarsInputState {
+function createDefaultInputState(width: number, height: number): InputState {
   return {
     game: createDefaultGameState(width, height),
     ui: createDefaultUIState(),
@@ -92,13 +92,13 @@ function createDefaultTileData(coord: Coord): TileData {
   };
 }
 
-function createBlobWarsBoardStore(width: number, height: number) {
+function createBoardStore(width: number, height: number) {
   const tileCache = new Map<CoordKey, TileData>();
   const tileSubs = new Map<CoordKey, Set<() => void>>();
 
   // Seam: iteration is the main shape coupling between this store and the grid.
   // To extract, promote to a config param.
-  function iterateCoords(state: BlobWarsState, cb: (coord: Coord) => void): void {
+  function iterateCoords(state: State, cb: (coord: Coord) => void): void {
     for (let y = 0; y < state.game.height; y++) {
       for (let x = 0; x < state.game.width; x++) {
         cb({ x, y });
@@ -106,7 +106,7 @@ function createBlobWarsBoardStore(width: number, height: number) {
     }
   }
 
-  function runPipeline(state: BlobWarsState): { changed: number; total: number; newlyOccupied: number } {
+  function runPipeline(state: State): { changed: number; total: number; newlyOccupied: number } {
     let changed = 0;
     let total = 0;
     let newlyOccupied = 0;
@@ -129,12 +129,12 @@ function createBlobWarsBoardStore(width: number, height: number) {
     return { changed, total, newlyOccupied };
   }
 
-  const store = createStore<BlobWarsInputState, DerivedState>({
+  const store = createStore<InputState, DerivedState>({
     initialState: createDefaultInputState(width, height),
     derive: (state) => {
       const tick = state.game.tick;
       perfLog.event('pipeStart', tick);
-      return perfLog.timed('derive', tick, () => deriveBlobWarsState(state));
+      return perfLog.timed('derive', tick, () => deriveState(state));
     },
     onChange: (merged) => {
       const tick = merged.game.tick;
@@ -195,7 +195,7 @@ function createBlobWarsBoardStore(width: number, height: number) {
   };
 }
 
-type BlobWarsBoardStoreInstance = ReturnType<typeof createBlobWarsBoardStore>;
+type BoardStoreInstance = ReturnType<typeof createBoardStore>;
 
-export type { BlobWarsBoardStoreInstance };
-export { createBlobWarsBoardStore, createDefaultTileData };
+export type { BoardStoreInstance };
+export { createBoardStore, createDefaultTileData };

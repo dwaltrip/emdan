@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 
 import type { MatchSnapshot, TileState } from "../shared/protocol";
 import { createActions } from "../ui/src/board-store/actions";
-import { createBlobWarsBoardStore } from "../ui/src/board-store/board-store";
+import { createBoardStore } from "../ui/src/board-store/board-store";
 
 function emptyTile(): TileState {
   return { terrain: "blank", owner: null, origin: null, plantedTick: null, lastGrowthTick: null };
@@ -48,7 +48,7 @@ function run(label: string, fn: () => void): void {
 }
 
 run("per-tile diff fires only on changed tiles", () => {
-  const store = createBlobWarsBoardStore(3, 3);
+  const store = createBoardStore(3, 3);
   const actions = createActions(store);
 
   const fires = new Map<string, number>();
@@ -77,7 +77,7 @@ run("per-tile diff fires only on changed tiles", () => {
 });
 
 run("applySnapshot is idempotent (no fires on identical re-apply)", () => {
-  const store = createBlobWarsBoardStore(3, 3);
+  const store = createBoardStore(3, 3);
   const actions = createActions(store);
 
   const tiles: TileState[][] = [
@@ -102,7 +102,7 @@ run("applySnapshot is idempotent (no fires on identical re-apply)", () => {
 });
 
 run("tile owner/origin reflect the snapshot", () => {
-  const store = createBlobWarsBoardStore(2, 2);
+  const store = createBoardStore(2, 2);
   const actions = createActions(store);
 
   actions.applySnapshot(

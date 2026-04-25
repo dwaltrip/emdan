@@ -13,7 +13,7 @@ interface Coord {
 
 type TileSource = TileState;
 
-interface BlobWarsSourceState {
+interface SourceState {
   matchId: string | null;
   width: number;
   height: number;
@@ -29,8 +29,8 @@ interface BlobWarsSourceState {
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 interface UIState {}
 
-interface BlobWarsInputState {
-  game: BlobWarsSourceState;
+interface InputState {
+  game: SourceState;
   ui: UIState;
   connectionStatus: ConnectionStatus;
 }
@@ -39,7 +39,7 @@ interface DerivedState {
   excludedCoords: Map<CoordKey, Set<PlayerId>>;
 }
 
-type BlobWarsState = BlobWarsInputState & DerivedState;
+type State = InputState & DerivedState;
 
 type ExclusionSource = PlayerId | 'both' | null;
 
@@ -59,11 +59,11 @@ export type {
   ConnectionStatus,
   Coord,
   TileSource,
-  BlobWarsSourceState,
+  SourceState,
   UIState,
-  BlobWarsInputState,
+  InputState,
   DerivedState,
-  BlobWarsState,
+  State,
   ExclusionSource,
   TileData,
 };

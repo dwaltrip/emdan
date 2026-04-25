@@ -1,9 +1,9 @@
 import { useSyncExternalStore } from 'react';
 
 import type { MatchPhase } from '@shared/protocol';
-import type { BlobWarsSession } from '@/session/session';
+import type { Session } from '@/session/session';
 
-function usePhase(session: BlobWarsSession): MatchPhase {
+function usePhase(session: Session): MatchPhase {
   return useSyncExternalStore(
     session.store.subscribe,
     () => session.store.state.game.phase,

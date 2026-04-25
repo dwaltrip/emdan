@@ -1,8 +1,8 @@
 import { useSyncExternalStore } from 'react';
 
-import type { BlobWarsSession } from '@/session/session';
+import type { Session } from '@/session/session';
 
-function useMatchId(session: BlobWarsSession): string | null {
+function useMatchId(session: Session): string | null {
   return useSyncExternalStore(
     session.store.subscribe,
     () => session.store.state.game.matchId,

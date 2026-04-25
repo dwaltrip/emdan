@@ -4,16 +4,16 @@ import type {
   ServerMessage,
 } from '@shared/protocol';
 
-import { createActions, type BlobWarsBoardStoreInstance } from '@/board-store';
+import { createActions, type BoardStoreInstance } from '@/board-store';
 import { perfLog } from '@/lib/perf-log';
 
 interface SessionDeps {
-  store: BlobWarsBoardStoreInstance;
+  store: BoardStoreInstance;
   send: (msg: ClientMessage) => void;
 }
 
-interface BlobWarsSession {
-  store: BlobWarsBoardStoreInstance;
+interface Session {
+  store: BoardStoreInstance;
   handleMessage: (msg: ServerMessage) => void;
   handleOpen: () => void;
   handleClose: () => void;
@@ -22,7 +22,7 @@ interface BlobWarsSession {
   joinLobby: () => void;
 }
 
-function createBlobWarsSession({ store, send }: SessionDeps): BlobWarsSession {
+function createSession({ store, send }: SessionDeps): Session {
   const actions = createActions(store);
   let currentMatchId: string | null = null;
 
@@ -92,5 +92,5 @@ function createBlobWarsSession({ store, send }: SessionDeps): BlobWarsSession {
   };
 }
 
-export type { BlobWarsSession };
-export { createBlobWarsSession };
+export type { Session };
+export { createSession };

@@ -4,9 +4,9 @@ import type { PlayerSeat } from "@shared/protocol";
 import { GRID_HEIGHT, GRID_WIDTH } from "@shared/protocol";
 
 import "./App.css";
-import type { BlobWarsSession } from "./session/session";
+import type { Session } from "./session/session";
 import { session } from "./session/session-instance";
-import type { ConnectionStatus, BlobWarsSourceState } from "./board-store";
+import type { ConnectionStatus, SourceState } from "./board-store";
 import { Board } from "./components/board";
 import { useCurrentUser } from "./hooks/use-current-user";
 import { useMatchId } from "./hooks/use-match-id";
@@ -93,7 +93,7 @@ function StatusBar({ status }: StatusBarProps) {
 }
 
 interface MatchDetailsProps {
-  session: BlobWarsSession;
+  session: Session;
 }
 
 function MatchDetails({ session }: MatchDetailsProps) {
@@ -130,7 +130,7 @@ function MatchDetails({ session }: MatchDetailsProps) {
   );
 }
 
-function describePhase(game: BlobWarsSourceState, seat: PlayerSeat): string {
+function describePhase(game: SourceState, seat: PlayerSeat): string {
   if (game.phase === "placing") {
     if (game.currentTurn === seat) return "Your turn to place a seed";
     return "Opponent placing…";
