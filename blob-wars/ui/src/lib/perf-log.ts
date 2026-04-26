@@ -19,17 +19,6 @@ const PERF_DEBUG =
   new URLSearchParams(window.location.search).has('perfDebug');
 
 let lastLogAt: number | null = null;
-let tileRenderCount = 0;
-
-function bumpTileRender(): void {
-  tileRenderCount++;
-}
-
-function drainTileRenders(): number {
-  const c = tileRenderCount;
-  tileRenderCount = 0;
-  return c;
-}
 
 // --- Structured record buffer ---
 
@@ -55,16 +44,11 @@ interface TickRecord extends BaseRecord {
   wsRecvToPipeStart: number | null;
   derive: number | null;
   diff: number | null;
-  pipeEndToCommit: number | null;
-  commitMs: number | null;
-  commitBase: number | null;
-  commitToPaint: number | null;
   canvasDraw: number | null;
   wsRecvToPaint: number | null;
   changed: number | null;
   total: number | null;
   newlyOccupied: number | null;
-  tileRenders: number;
 }
 
 interface LongTaskRecord extends BaseRecord {
@@ -147,15 +131,6 @@ function formatTickLine(key: string | number, events: RecorderEvent[]): void {
     const v = byName.get(name)?.data?.[k];
     return typeof v === 'number' ? v : null;
   };
-  const strOrNumField = (name: string, k: string): number | null => {
-    const v = byName.get(name)?.data?.[k];
-    if (typeof v === 'number') return v;
-    if (typeof v === 'string') {
-      const n = Number(v);
-      return Number.isFinite(n) ? n : null;
-    }
-    return null;
-  };
 
   const fmt = (v: number | null, digits = 1): string =>
     v === null ? '?' : v.toFixed(digits);
@@ -163,34 +138,25 @@ function formatTickLine(key: string | number, events: RecorderEvent[]): void {
   const now = performance.now();
   const delta = lastLogAt === null ? 0 : now - lastLogAt;
   lastLogAt = now;
-  const tileRenders = drainTileRenders();
 
   const wsRecvToPipeStart = gapMs('wsRecv', 'pipeStart');
   const derive = durMs('derive');
   const diff = durMs('diff');
-  const pipeEndToCommit = gapMs('pipeEnd', 'reactCommit');
-  const commitMs = numField('reactCommit', 'ms');
-  const commitBase = numField('reactCommit', 'base');
-  const commitToPaint = gapMs('reactCommit', 'paint');
   const canvasDraw = durMs('canvasDraw');
   const wsRecvToPaint = gapMs('wsRecv', 'paint');
-  const changed = strOrNumField('pipeEnd', 'changed');
-  const total = strOrNumField('pipeEnd', 'total');
-  const newlyOccupied = strOrNumField('pipeEnd', 'newlyOccupied');
+  const changed = numField('pipeEnd', 'changed');
+  const total = numField('pipeEnd', 'total');
+  const newlyOccupied = numField('pipeEnd', 'newlyOccupied');
 
   console.log(
     `[${formatTimestamp(new Date())} +${delta.toFixed(0).padStart(4, ' ')}ms] ` +
       `tick=${key} ` +
       `wsRecv→pipeStart=${fmt(wsRecvToPipeStart)} ` +
       `derive=${fmt(derive)} diff=${fmt(diff)} ` +
-      `pipeEnd→commit=${fmt(pipeEndToCommit)} ` +
-      `commit=${fmt(commitMs)}/${fmt(commitBase)} ` +
-      `commit→paint=${fmt(commitToPaint)} ` +
       `canvasDraw=${fmt(canvasDraw)} ` +
       `wsRecv→paint=${fmt(wsRecvToPaint)}ms ` +
       `changed=${changed ?? '?'}/${total ?? '?'} ` +
-      `occupied=+${newlyOccupied ?? '?'} ` +
-      `tileRenders=${tileRenders}`,
+      `occupied=+${newlyOccupied ?? '?'}`,
   );
 
   const ctx = getContext();
@@ -208,16 +174,11 @@ function formatTickLine(key: string | number, events: RecorderEvent[]): void {
     wsRecvToPipeStart,
     derive,
     diff,
-    pipeEndToCommit,
-    commitMs,
-    commitBase,
-    commitToPaint,
     canvasDraw,
     wsRecvToPaint,
     changed,
     total,
     newlyOccupied,
-    tileRenders,
   });
 }
 
@@ -366,7 +327,6 @@ const noopPerfLog = {
   event: (_name: string, _key: string | number, _data?: Record<string, unknown>) => {},
   timed: <T>(_name: string, _key: string | number, fn: () => T): T => fn(),
   rAFEvent: (_name: string, _key: string | number) => {},
-  bumpTileRender: () => {},
   setContextProvider: (_fn: () => PerfContext) => {},
   dump: (_reason: string) => {},
 };
@@ -376,7 +336,6 @@ const perfLog = PERF_DEBUG
       event: recorder.event,
       timed: recorder.timed,
       rAFEvent,
-      bumpTileRender,
       setContextProvider,
       dump,
     }
