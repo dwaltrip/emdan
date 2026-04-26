@@ -120,6 +120,11 @@ function getVisibility(): { visibilityState: DocumentVisibilityState | null; has
 function formatTickLine(key: string | number, events: RecorderEvent[]): void {
   const byName = new Map(events.map((e) => [e.name, e]));
 
+  // No `wsRecv` means this flush wasn't driven by a real pipeline cycle
+  // (e.g. a stray closing event with an empty buffer). Skip — logging it
+  // produces an all-`?` line and an all-null record.
+  if (!byName.has('wsRecv')) return;
+
   const gapMs = (a: string, b: string): number | null => {
     const ea = byName.get(a);
     const eb = byName.get(b);

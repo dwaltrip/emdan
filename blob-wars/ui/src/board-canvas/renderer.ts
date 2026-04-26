@@ -91,6 +91,13 @@ function init(
     const animating = pulse.isActive(now);
     if (!tilesDirty && !frameDirty && !animating) return;
 
+    // `paint` is the perf recorder's closing event — only fire it when this
+    // frame actually closed a pipeline cycle (tile redraw). Hover-only and
+    // pulse-animation frames must not fire it, or they flush empty buffers.
+    // This var is a small smell: recorder semantics leaking into the renderer.
+    // If we continue to expand perf-logging, we can improve the decoupling.
+    // Possibly by exposing neutral render cycle hooks that perf-log uses.
+    const didPipelinePaint = tilesDirty;
     if (tilesDirty) {
       const tick = store.state.game.tick;
       perfLog.timed('canvasDraw', tick, () =>
@@ -106,7 +113,7 @@ function init(
     drawHoverRing(ctx!, hoverState.coord, interaction, theme, layout);
     pulse.draw(ctx!, store, theme, layout, now);
 
-    perfLog.rAFEvent('paint', store.state.game.tick);
+    if (didPipelinePaint) perfLog.rAFEvent('paint', store.state.game.tick);
     frameDirty = false;
     if (animating) scheduleFrame();
   }
