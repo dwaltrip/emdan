@@ -6,6 +6,7 @@ export type {
   Coord,
   CoordKey,
   DerivedState,
+  ExclusionSource,
   PlayerId,
   TileData,
   TileSource,
