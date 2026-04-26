@@ -37,6 +37,7 @@ interface InputState {
 
 interface DerivedState {
   excludedCoords: Map<CoordKey, Set<PlayerId>>;
+  seeds: Array<{ coord: Coord; owner: PlayerId }>;
 }
 
 type State = InputState & DerivedState;

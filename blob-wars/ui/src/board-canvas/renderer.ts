@@ -24,6 +24,7 @@ import type { Session } from '@/session/session';
 
 import { pixelToTile } from './coords';
 import { drawAllTiles, drawHoverRing } from './draw';
+import { createPulseEffect } from './effects/seed-pulse';
 import { describeInteraction } from './interaction';
 import { computeLayout, observeContainer, observeDpr, type LayoutState } from './layout';
 import { theme } from './theme';
@@ -65,6 +66,9 @@ function init(
   // in Phase 2. Consumed by describeInteraction → cursor + drawHoverRing.
   const hoverState: { coord: Coord | null } = { coord: null };
 
+  const pulse = createPulseEffect();
+  let prevTick = store.state.game.tick;
+
   function scheduleFrame(): void {
     if (rafId !== null) return;
     rafId = requestAnimationFrame(renderFrame);
@@ -83,7 +87,8 @@ function init(
 
   function renderFrame(): void {
     rafId = null;
-    const animating = false; // becomes pulse.isActive(now) when the first time effect lands
+    const now = performance.now();
+    const animating = pulse.isActive(now);
     if (!tilesDirty && !frameDirty && !animating) return;
 
     if (tilesDirty) {
@@ -94,11 +99,12 @@ function init(
       tilesDirty = false;
     }
 
-    // Composite: blit tile layer, then pure effects (then time effects in commit 2).
+    // Composite: blit tile layer, then pure effects, then time effects.
     ctx!.drawImage(tileLayer, 0, 0);
     const interaction = describeInteraction(hoverState.coord, store, session);
     canvas.style.cursor = interaction.kind === 'placeable' ? 'pointer' : 'default';
     drawHoverRing(ctx!, hoverState.coord, interaction, theme, layout);
+    pulse.draw(ctx!, store, theme, layout, now);
 
     perfLog.rAFEvent('paint', store.state.game.tick);
     frameDirty = false;
@@ -109,7 +115,17 @@ function init(
   renderFrame();
 
   // Step 3: store subscription.
+  // Slice-of-state-change pattern: diffing a slice (tick) across notifies fires
+  // a renderer-local effect. Examples that fit: capture flare on owner flip,
+  // phase-change transitions. Inline diffing today (N=1); extract a
+  // `watchSlice(getter, onChange)` helper only when N grows or predicates get
+  // complex.
   const unsubStore = store.subscribe(() => {
+    const { phase, tick } = store.state.game;
+    if (phase === 'simulating' && tick !== prevTick) {
+      pulse.trigger(performance.now());
+    }
+    prevTick = tick;
     requestTilesRedraw();
   });
 
