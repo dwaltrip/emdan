@@ -4,9 +4,8 @@ import type { PlayerSeat } from "@shared/protocol";
 import { GRID_HEIGHT, GRID_WIDTH } from "@shared/protocol";
 
 import type { SourceState } from "@/board-store";
-import { Board } from "@/components/board";
+import { BoardCanvas } from "@/board-canvas/board-canvas";
 import { useMatchId } from "@/hooks/use-match-id";
-import { BoardProfiler } from "@/lib/board-profiler";
 import type { Session } from "@/session/session";
 
 import "./match-content.css";
@@ -20,14 +19,12 @@ export function MatchContent({ session }: MatchContentProps) {
   return (
     <>
       <MatchDetails session={session} />
-      <BoardProfiler>
-        <Board
-          key={matchId}
-          session={session}
-          width={GRID_WIDTH}
-          height={GRID_HEIGHT}
-        />
-      </BoardProfiler>
+      <BoardCanvas
+        key={matchId}
+        session={session}
+        width={GRID_WIDTH}
+        height={GRID_HEIGHT}
+      />
     </>
   );
 }

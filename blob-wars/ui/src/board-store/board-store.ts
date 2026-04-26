@@ -1,7 +1,7 @@
-// Per-tile cache + per-tile subs over a generic createStore.
+// Per-tile cache over a generic createStore.
 //
-// Skeleton (keep on extraction): tileCache/tileSubs Maps, runPipeline shape,
-// createStore wiring, subscribeTile/getTileData, reset.
+// Skeleton (keep on extraction): tileCache Map, runPipeline shape,
+// createStore wiring, getTileData, reset.
 // Filling (game-specific): defaults, derived shape, computeTileData, tilesEqual.
 //
 // Assumptions:
@@ -9,6 +9,11 @@
 // - state changes via discrete actions, not continuous animation
 // - per-tile rendering is independent (no cross-tile sprite stitching)
 // - grid size fixed for the lifetime of a session
+//
+// Subscription model: consumers use store.subscribe + store.getTileData.
+// A dedicated per-tile sub (subscribeTile) was deleted with the canvas swap;
+// reintroduce only if many React components subscribe per-tile (unlikely with
+// the canvas renderer drawing the whole board on dirty).
 
 import { createStore } from '@/lib/create-store';
 import { perfLog } from '@/lib/perf-log';
@@ -94,7 +99,6 @@ function createDefaultTileData(coord: Coord): TileData {
 
 function createBoardStore(width: number, height: number) {
   const tileCache = new Map<CoordKey, TileData>();
-  const tileSubs = new Map<CoordKey, Set<() => void>>();
 
   // Seam: iteration is the main shape coupling between this store and the grid.
   // To extract, promote to a config param.
@@ -122,8 +126,6 @@ function createBoardStore(width: number, height: number) {
           newlyOccupied++;
         }
         tileCache.set(key, next);
-        const subs = tileSubs.get(key);
-        if (subs) for (const cb of subs) cb();
       }
     });
     return { changed, total, newlyOccupied };
@@ -140,7 +142,7 @@ function createBoardStore(width: number, height: number) {
       const tick = merged.game.tick;
       const stats = perfLog.timed('diff', tick, () => runPipeline(merged));
       perfLog.event('pipeEnd', tick, stats);
-      perfLog.rAFEvent('paint', tick);
+      // `paint` is emitted by the canvas renderer at end of frame().
     },
   });
 
@@ -159,34 +161,14 @@ function createBoardStore(width: number, height: number) {
     mutate: store.mutate,
     subscribe: store.subscribe,
 
-    subscribeTile(coord: Coord, cb: () => void): () => void {
-      const key = serializeCoord(coord);
-      let subs = tileSubs.get(key);
-      if (!subs) {
-        subs = new Set();
-        tileSubs.set(key, subs);
-      }
-      subs.add(cb);
-      return () => {
-        subs!.delete(cb);
-      };
-    },
-
     getTileData(coord: Coord): TileData {
       return tileCache.get(serializeCoord(coord)) ?? createDefaultTileData(coord);
     },
 
-    // Reset clears tileCache AND tileSubs. Any Tile still mounted after a reset
-    // holds a subscription into an orphaned Set — runPipeline's notifications
-    // won't reach it, and it will freeze on stale data. Safe only when the
-    // board is keyed by matchId (React remounts Tiles before the next paint);
-    // do not call reset on a live, un-keyed board.
-    //
     // Only the `game` substate is reset. connectionStatus and UI state are
     // session-level and survive match transitions.
     reset(newWidth: number = width, newHeight: number = height): void {
       tileCache.clear();
-      tileSubs.clear();
       store.reset({
         ...store.state,
         game: createDefaultGameState(newWidth, newHeight),

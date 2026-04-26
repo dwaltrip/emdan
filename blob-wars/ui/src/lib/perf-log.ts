@@ -59,6 +59,7 @@ interface TickRecord extends BaseRecord {
   commitMs: number | null;
   commitBase: number | null;
   commitToPaint: number | null;
+  canvasDraw: number | null;
   wsRecvToPaint: number | null;
   changed: number | null;
   total: number | null;
@@ -171,6 +172,7 @@ function formatTickLine(key: string | number, events: RecorderEvent[]): void {
   const commitMs = numField('reactCommit', 'ms');
   const commitBase = numField('reactCommit', 'base');
   const commitToPaint = gapMs('reactCommit', 'paint');
+  const canvasDraw = durMs('canvasDraw');
   const wsRecvToPaint = gapMs('wsRecv', 'paint');
   const changed = strOrNumField('pipeEnd', 'changed');
   const total = strOrNumField('pipeEnd', 'total');
@@ -184,6 +186,7 @@ function formatTickLine(key: string | number, events: RecorderEvent[]): void {
       `pipeEnd→commit=${fmt(pipeEndToCommit)} ` +
       `commit=${fmt(commitMs)}/${fmt(commitBase)} ` +
       `commit→paint=${fmt(commitToPaint)} ` +
+      `canvasDraw=${fmt(canvasDraw)} ` +
       `wsRecv→paint=${fmt(wsRecvToPaint)}ms ` +
       `changed=${changed ?? '?'}/${total ?? '?'} ` +
       `occupied=+${newlyOccupied ?? '?'} ` +
@@ -209,6 +212,7 @@ function formatTickLine(key: string | number, events: RecorderEvent[]): void {
     commitMs,
     commitBase,
     commitToPaint,
+    canvasDraw,
     wsRecvToPaint,
     changed,
     total,
