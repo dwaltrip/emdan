@@ -5,8 +5,10 @@ import type { TileInteraction } from './interaction';
 import type { LayoutState } from './layout';
 import type { Theme } from './theme';
 
+type Ctx2D = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
+
 function drawAllTiles(
-  ctx: CanvasRenderingContext2D,
+  ctx: Ctx2D,
   store: BoardStoreInstance,
   theme: Theme,
   layout: LayoutState,
@@ -24,7 +26,7 @@ function drawAllTiles(
 }
 
 function drawTile(
-  ctx: CanvasRenderingContext2D,
+  ctx: Ctx2D,
   x: number,
   y: number,
   tile: TileData,

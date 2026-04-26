@@ -25,7 +25,7 @@ import type { Session } from '@/session/session';
 import { pixelToTile } from './coords';
 import { drawAllTiles, drawHoverRing } from './draw';
 import { describeInteraction } from './interaction';
-import { applyLayout, observeContainer, observeDpr, type LayoutState } from './layout';
+import { computeLayout, observeContainer, observeDpr, type LayoutState } from './layout';
 import { theme } from './theme';
 
 function init(
@@ -39,8 +39,26 @@ function init(
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('[board-canvas] 2D context unavailable');
 
-  let layout: LayoutState = applyLayout(canvas, container, width, height);
-  let dirty = true;
+  let layout: LayoutState = computeLayout(container, width, height);
+  const tileLayer = new OffscreenCanvas(layout.backingWidth, layout.backingHeight);
+  const tileLayerCtx = tileLayer.getContext('2d');
+  if (!tileLayerCtx) throw new Error('[board-canvas] tile layer 2D context unavailable');
+
+  // TODO: revisit this abstraction if more layers arrive or layout complexity
+  // grows further — likely extract per-surface apply helpers into layout.ts at
+  // that point.
+  function applyLayoutToSurfaces(): void {
+    canvas.width = layout.backingWidth;
+    canvas.height = layout.backingHeight;
+    canvas.style.width = `${layout.backingWidth / layout.dpr}px`;
+    canvas.style.height = `${layout.backingHeight / layout.dpr}px`;
+    tileLayer.width = layout.backingWidth;
+    tileLayer.height = layout.backingHeight;
+  }
+  applyLayoutToSurfaces();
+
+  let tilesDirty = true;
+  let frameDirty = true;
   let rafId: number | null = null;
 
   // State for the indicator pass. Hover today; exclusion-radius preview etc.
@@ -49,38 +67,50 @@ function init(
 
   function scheduleFrame(): void {
     if (rafId !== null) return;
-    rafId = requestAnimationFrame(frame);
+    rafId = requestAnimationFrame(renderFrame);
   }
 
-  // Public "I changed something, please redraw" wrapper. Phase 2's continuous
-  // rAF will call scheduleFrame() directly from inside frame() (no re-mark)
-  // to keep the loop alive while an animation is in flight.
-  function requestRender(): void {
-    dirty = true;
+  function requestTilesRedraw(): void {
+    tilesDirty = true;
+    frameDirty = true;
     scheduleFrame();
   }
 
-  function frame(): void {
-    rafId = null;
-    if (!dirty) return;
+  function requestComposite(): void {
+    frameDirty = true;
+    scheduleFrame();
+  }
 
+  function renderFrame(): void {
+    rafId = null;
+    const animating = false; // becomes pulse.isActive(now) when the first time effect lands
+    if (!tilesDirty && !frameDirty && !animating) return;
+
+    if (tilesDirty) {
+      const tick = store.state.game.tick;
+      perfLog.timed('canvasDraw', tick, () =>
+        drawAllTiles(tileLayerCtx!, store, theme, layout),
+      );
+      tilesDirty = false;
+    }
+
+    // Composite: blit tile layer, then pure effects (then time effects in commit 2).
+    ctx!.drawImage(tileLayer, 0, 0);
     const interaction = describeInteraction(hoverState.coord, store, session);
     canvas.style.cursor = interaction.kind === 'placeable' ? 'pointer' : 'default';
-
-    const tick = store.state.game.tick;
-    perfLog.timed('canvasDraw', tick, () => drawAllTiles(ctx!, store, theme, layout));
     drawHoverRing(ctx!, hoverState.coord, interaction, theme, layout);
-    perfLog.rAFEvent('paint', tick);
 
-    dirty = false;
+    perfLog.rAFEvent('paint', store.state.game.tick);
+    frameDirty = false;
+    if (animating) scheduleFrame();
   }
 
   // Step 2: synchronous first paint (relies on the contract above).
-  frame();
+  renderFrame();
 
   // Step 3: store subscription.
   const unsubStore = store.subscribe(() => {
-    requestRender();
+    requestTilesRedraw();
   });
 
   // Step 4: pointer handlers.
@@ -93,13 +123,13 @@ function init(
       hoverState.coord.y !== next.y
     ) {
       hoverState.coord = next;
-      requestRender();
+      requestComposite();
     }
   }
   function onPointerLeave(): void {
     if (hoverState.coord !== null) {
       hoverState.coord = null;
-      requestRender();
+      requestComposite();
     }
   }
   function onClick(e: MouseEvent): void {
@@ -116,8 +146,9 @@ function init(
 
   // Step 5: container size + DPR observers.
   function relayout(): void {
-    layout = applyLayout(canvas, container, width, height);
-    requestRender();
+    layout = computeLayout(container, width, height);
+    applyLayoutToSurfaces();
+    requestTilesRedraw();
   }
   const unobserveContainer = observeContainer(container, relayout);
   const unobserveDpr = observeDpr(relayout);

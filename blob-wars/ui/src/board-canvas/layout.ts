@@ -6,8 +6,7 @@ interface LayoutState {
   backingHeight: number;
 }
 
-function applyLayout(
-  canvas: HTMLCanvasElement,
+function computeLayout(
   container: HTMLElement,
   gridWidth: number,
   gridHeight: number,
@@ -19,11 +18,6 @@ function applyLayout(
   );
   const backingWidth = cellDevicePx * gridWidth;
   const backingHeight = cellDevicePx * gridHeight;
-
-  canvas.width = backingWidth;
-  canvas.height = backingHeight;
-  canvas.style.width = `${backingWidth / dpr}px`;
-  canvas.style.height = `${backingHeight / dpr}px`;
 
   return {
     cellDevicePx,
@@ -67,4 +61,4 @@ function observeDpr(onChange: () => void): () => void {
 }
 
 export type { LayoutState };
-export { applyLayout, observeContainer, observeDpr };
+export { computeLayout, observeContainer, observeDpr };
