@@ -19,13 +19,13 @@ const SEAT_COLORS: Record<PlayerSeat, SeatPalette> = {
     base: '#613fb0',
     hoverBorder: '#b89cff',
     hoverGlow: 'rgba(184, 156, 255, 0.45)',
-    pulseFill: 'rgba(184, 156, 255, 0.30)',
+    pulseFill: 'rgba(66, 52, 100, 0.57)',
   },
   player2: {
     base: '#226e3e',
     hoverBorder: '#6fd095',
     hoverGlow: 'rgba(111, 208, 149, 0.45)',
-    pulseFill: 'rgba(111, 208, 149, 0.30)',
+    pulseFill: 'rgba(33, 75, 50, 0.69)',
   },
 };
 

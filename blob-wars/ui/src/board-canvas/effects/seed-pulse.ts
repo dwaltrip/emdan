@@ -20,8 +20,8 @@ import type { Theme } from '../theme';
 
 // alt curves to explore: cubic-bezier expansion, additive blend on rapid ticks,
 // ring-stroke variant, per-seat asymmetric curves.
-const PULSE_DURATION_MS = 400;
-const PULSE_MAX_RADIUS_MULT = 2.0;
+const PULSE_DURATION_MS = 600;
+const PULSE_MAX_RADIUS_MULT = 4.0;
 const SEED_DOT_RADIUS_MULT = 0.15;
 
 interface TimeEffect {
