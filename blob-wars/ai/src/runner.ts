@@ -1,0 +1,105 @@
+import { WebSocket } from "ws";
+
+import {
+  type ClientMessage,
+  type MatchSnapshot,
+  type PlayerSeat,
+  type ServerMessage,
+  parseServerMessage,
+  serializeClientMessage,
+} from "@shared/protocol";
+
+import { blobWarsAI } from "@/blob-wars-ai";
+
+const WS_URL = process.env.AI_WS_URL ?? "ws://localhost:3002";
+
+type AiState =
+  | { kind: "idle" }
+  | { kind: "inMatch"; seat: PlayerSeat; lastTick: number };
+
+export function startAiPlayer(): void {
+  let state: AiState = { kind: "idle" };
+  const socket = new WebSocket(WS_URL);
+
+  socket.on("open", () => {
+    console.log(`[ai-player] connected to ${WS_URL}, joining lobby`);
+    send({ type: "joinLobby" });
+  });
+
+  socket.on("message", (raw) => {
+    const msg = parseServerMessage(raw.toString());
+    if (!msg) {
+      console.warn("[ai-player] unparsed payload");
+      return;
+    }
+    handleMessage(msg);
+  });
+
+  socket.on("close", () => {
+    console.log("[ai-player] socket closed, exiting");
+    process.exit(0);
+  });
+
+  socket.on("error", (err) => {
+    console.error("[ai-player] socket error", err);
+  });
+
+  function handleMessage(msg: ServerMessage): void {
+    switch (msg.type) {
+      case "welcome":
+      case "lobbyUpdate":
+        return;
+
+      case "error":
+        console.warn(`[ai-player] server error: ${msg.code} — ${msg.message}`);
+        return;
+
+      case "matchStarted":
+        state = { kind: "inMatch", seat: msg.seat, lastTick: -1 };
+        console.log(`[ai-player] match started, seat=${msg.seat}`);
+        maybeAct(msg.state);
+        return;
+
+      case "stateUpdate":
+        maybeAct(msg.state);
+        return;
+
+      case "matchEnded":
+        console.log(
+          `[ai-player] match ended: reason=${msg.reason}, winner=${msg.winner}`,
+        );
+        state = { kind: "idle" };
+        socket.close();
+        return;
+    }
+  }
+
+  function maybeAct(snapshot: MatchSnapshot): void {
+    if (state.kind !== "inMatch") return;
+
+    if (snapshot.tick === state.lastTick) return;
+    state.lastTick = snapshot.tick;
+
+    if (!isMyTurn(snapshot, state.seat)) return;
+
+    const move = blobWarsAI.getMove(snapshot, state.seat);
+    if (!move) return;
+
+    send(move);
+  }
+
+  function send(msg: ClientMessage): void {
+    if (socket.readyState !== WebSocket.OPEN) {
+      console.warn("[ai-player] send while not open", msg);
+      return;
+    }
+    socket.send(serializeClientMessage(msg));
+  }
+}
+
+function isMyTurn(snapshot: MatchSnapshot, seat: PlayerSeat): boolean {
+  if (snapshot.phase === "placing") {
+    return snapshot.currentTurn === seat;
+  }
+  return false;
+}
