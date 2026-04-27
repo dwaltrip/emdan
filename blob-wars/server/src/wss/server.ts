@@ -37,6 +37,7 @@ export function startServer(port = getPort(), host = getHost()): RunningServer {
       socket,
     };
 
+    console.log(`[wss] client connected: ${client.id}`);
     lobby.addConnection(client);
 
     socket.on("message", (rawMessage) => {
@@ -59,6 +60,7 @@ export function startServer(port = getPort(), host = getHost()): RunningServer {
     });
 
     socket.on("close", () => {
+      console.log(`[wss] client disconnected: ${client.id}`);
       lobby.removeConnection(client.id);
     });
   });

@@ -12,10 +12,11 @@ import {
 import { blobWarsAI } from "@/blob-wars-ai";
 
 const WS_URL = process.env.AI_WS_URL ?? "ws://localhost:3002";
+const VERBOSE = process.env.VERBOSE === "1" || process.env.VERBOSE === "true";
 
 type AiState =
   | { kind: "idle" }
-  | { kind: "inMatch"; seat: PlayerSeat; lastTick: number };
+  | { kind: "inMatch"; seat: PlayerSeat };
 
 export function startAiPlayer(): void {
   let state: AiState = { kind: "idle" };
@@ -55,12 +56,13 @@ export function startAiPlayer(): void {
         return;
 
       case "matchStarted":
-        state = { kind: "inMatch", seat: msg.seat, lastTick: -1 };
+        state = { kind: "inMatch", seat: msg.seat };
         console.log(`[ai-player] match started, seat=${msg.seat}`);
         maybeAct(msg.state);
         return;
 
       case "stateUpdate":
+        if (VERBOSE) logSnapshot(msg.state);
         maybeAct(msg.state);
         return;
 
@@ -76,15 +78,14 @@ export function startAiPlayer(): void {
 
   function maybeAct(snapshot: MatchSnapshot): void {
     if (state.kind !== "inMatch") return;
-
-    if (snapshot.tick === state.lastTick) return;
-    state.lastTick = snapshot.tick;
-
     if (!isMyTurn(snapshot, state.seat)) return;
 
     const move = blobWarsAI.getMove(snapshot, state.seat);
     if (!move) return;
 
+    if (VERBOSE) {
+      console.log(`[ai-player] sending move:`, move);
+    }
     send(move);
   }
 
@@ -95,6 +96,15 @@ export function startAiPlayer(): void {
     }
     socket.send(serializeClientMessage(msg));
   }
+}
+
+function logSnapshot(snapshot: MatchSnapshot): void {
+  const seat = snapshot.currentUser.seat;
+  const seeds = seat ? snapshot.players[seat].seedsRemaining : "?";
+  console.log(
+    `[ai-player] snapshot: tick=${snapshot.tick} phase=${snapshot.phase} ` +
+      `currentTurn=${snapshot.currentTurn ?? "-"} mySeeds=${seeds}`,
+  );
 }
 
 function isMyTurn(snapshot: MatchSnapshot, seat: PlayerSeat): boolean {

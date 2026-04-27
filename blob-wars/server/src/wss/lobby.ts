@@ -76,6 +76,8 @@ export class GlobalLobby {
     const seat: PlayerSeat = this.waitingPlayers.length === 0 ? "player1" : "player2";
     this.waitingPlayers.push(client);
 
+    console.log(`[lobby] ${client.id} joined as ${seat} (${this.waitingPlayers.length}/2)`);
+
     this.send(client, { type: "welcome", seat });
 
     this.broadcastLobbyUpdate();
@@ -90,6 +92,8 @@ export class GlobalLobby {
     if (!player1 || !player2) {
       return;
     }
+
+    console.log(`[lobby] starting match: player1=${player1.id} player2=${player2.id}`);
 
     this.waitingPlayers.length = 0;
     const bySeat: Record<PlayerSeat, ClientConnection> = { player1, player2 };

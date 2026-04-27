@@ -29,7 +29,7 @@ trap cleanup SIGINT SIGTERM
 echo "📦 Starting server..."
 cd "$PROJECT_ROOT/server"
 fnm use 2>/dev/null || true
-pnpm dev &
+VERBOSE="${VERBOSE-}" pnpm dev &
 SERVER_PID=$!
 
 # Give the server a moment to start up

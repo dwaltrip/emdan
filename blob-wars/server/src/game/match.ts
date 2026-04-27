@@ -18,6 +18,8 @@ interface MatchOptions {
   onEnded: () => void;
 }
 
+const VERBOSE = process.env.VERBOSE === "1" || process.env.VERBOSE === "true";
+
 export class Match {
   readonly id: string;
 
@@ -66,13 +68,21 @@ export class Match {
 
     const result = this.engine.placeSeed(seat, message.x, message.y);
     if (!result.ok) {
+      if (VERBOSE) {
+        console.log(`[match:${this.id}] ${seat} plantSeed(${message.x},${message.y}) rejected: ${result.code}`);
+      }
       this.sendError(seat, result.code, result.message);
       return;
+    }
+
+    if (VERBOSE) {
+      console.log(`[match:${this.id}] ${seat} plantSeed(${message.x},${message.y}) ok`);
     }
 
     this.broadcastState();
 
     if (result.phaseChanged === "simulating") {
+      console.log(`[match:${this.id}] entering simulating phase`);
       this.startSimulationTimer();
     }
   }
@@ -115,7 +125,12 @@ export class Match {
     }
 
     this.ended = true;
+    const ticks = this.engine.toSnapshot().tick;
     this.engine.end();
+    const durationSec = Math.round((Date.now() - this.startedAt) / 1000);
+    console.log(
+      `[match:${this.id}] ended: reason=${reason} winner=${winner} duration=${durationSec}s ticks=${ticks}`,
+    );
 
     if (this.timer) {
       clearInterval(this.timer);
