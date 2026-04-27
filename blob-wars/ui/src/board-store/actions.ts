@@ -7,6 +7,9 @@ function createActions(store: BoardStoreInstance) {
   return {
     applySnapshot: store.makeAction(
       (state: InputState, snapshot: MatchSnapshot) => {
+        // Rotate `state.game` reference so consumers using it as a memo dep
+        // (React Compiler, useMemo, React.memo) invalidate per action.
+        state.game = { ...state.game };
         state.game.matchId = snapshot.matchId;
         state.game.width = snapshot.board.width;
         state.game.height = snapshot.board.height;
@@ -15,11 +18,7 @@ function createActions(store: BoardStoreInstance) {
         state.game.phase = snapshot.phase;
         state.game.currentTurn = snapshot.currentTurn;
         state.game.players = snapshot.players;
-        // Preserve reference when seat is unchanged so useCurrentUser bails
-        // via Object.is instead of re-rendering App every tick.
-        if (state.game.currentUser.seat !== snapshot.currentUser.seat) {
-          state.game.currentUser = snapshot.currentUser;
-        }
+        state.game.currentUser = snapshot.currentUser;
       },
     ),
     setConnectionStatus: store.makeAction(

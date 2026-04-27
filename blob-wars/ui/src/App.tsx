@@ -2,13 +2,13 @@ import "./App.css";
 import type { ConnectionStatus } from "./board-store";
 import { HomeContent } from "./components/home-content";
 import { MatchContent } from "./components/match-content";
-import { useCurrentUser } from "./hooks/use-current-user";
+import { useCurrentUserSeat } from "./hooks/use-current-user-seat";
 import { useStatus } from "./hooks/use-status";
 import { session } from "./session/session-instance";
 
 function App() {
   const status = useStatus(session);
-  const { seat } = useCurrentUser(session);
+  const seat = useCurrentUserSeat(session);
 
   return (
     <main className="app-shell">
