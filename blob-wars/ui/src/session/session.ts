@@ -2,6 +2,7 @@ import type {
   ClientMessage,
   MatchSnapshot,
   ServerMessage,
+  WantOpponent,
 } from '@shared/protocol';
 
 import { createActions, type BoardStoreInstance } from '@/board-store';
@@ -19,7 +20,7 @@ interface Session {
   handleClose: () => void;
   plant: (x: number, y: number) => void;
   canPlant: () => boolean;
-  joinLobby: () => void;
+  joinLobby: (wantOpponent: WantOpponent) => void;
 }
 
 function createSession({ store, send }: SessionDeps): Session {
@@ -37,10 +38,16 @@ function createSession({ store, send }: SessionDeps): Session {
   function handleMessage(msg: ServerMessage): void {
     switch (msg.type) {
       case 'welcome':
-      case 'lobbyUpdate':
       case 'error':
         return;
+      case 'lobbyUpdate':
+        actions.setWaitingFor(msg.waitingFor);
+        return;
       case 'matchStarted':
+        actions.setWaitingFor(null);
+        actions.setOpponentRole(msg.opponentRole);
+        applyIncoming(msg.state);
+        return;
       case 'stateUpdate':
         applyIncoming(msg.state);
         return;
@@ -67,8 +74,8 @@ function createSession({ store, send }: SessionDeps): Session {
     send({ type: 'plantSeed', x, y });
   }
 
-  function joinLobby(): void {
-    send({ type: 'joinLobby' });
+  function joinLobby(wantOpponent: WantOpponent): void {
+    send({ type: 'joinLobby', role: 'human', wantOpponent });
   }
 
   function canPlant(): boolean {

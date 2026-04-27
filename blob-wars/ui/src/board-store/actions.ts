@@ -1,4 +1,4 @@
-import type { MatchSnapshot } from '@shared/protocol';
+import type { ClientRole, MatchSnapshot } from '@shared/protocol';
 
 import type { BoardStoreInstance } from './board-store';
 import type { InputState, ConnectionStatus } from './types';
@@ -24,6 +24,16 @@ function createActions(store: BoardStoreInstance) {
     setConnectionStatus: store.makeAction(
       (state: InputState, status: ConnectionStatus) => {
         state.connectionStatus = status;
+      },
+    ),
+    setWaitingFor: store.makeAction(
+      (state: InputState, waitingFor: ClientRole | null) => {
+        state.waitingFor = waitingFor;
+      },
+    ),
+    setOpponentRole: store.makeAction(
+      (state: InputState, opponentRole: ClientRole | null) => {
+        state.opponentRole = opponentRole;
       },
     ),
   };

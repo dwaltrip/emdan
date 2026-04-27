@@ -11,6 +11,8 @@ export type MatchWinner = PlayerSeat | "draw";
 export type MatchPhase = "placing" | "simulating" | "ended";
 export type TileOrigin = "seed" | "spread";
 export type TileTerrain = "blank" | "wall";
+export type ClientRole = "human" | "bot";
+export type WantOpponent = "human" | "ai";
 
 export interface TileState {
   terrain: TileTerrain;
@@ -47,6 +49,9 @@ export interface MatchSnapshot {
 
 export interface JoinLobbyMessage {
   type: "joinLobby";
+  role: ClientRole;
+  wantOpponent?: WantOpponent;
+  botToken?: string;
 }
 
 export interface PlantSeedMessage {
@@ -69,14 +74,15 @@ export interface WelcomeMessage {
 
 export interface LobbyUpdateMessage {
   type: "lobbyUpdate";
-  playersConnected: number;
-  requiredPlayers: number;
-  ready: boolean;
+  // TODO: when matches support num_players > 2, broadcast lobbyUpdate on every
+  // queue change so waiting players see fill progress (e.g. "2/3 ready").
+  waitingFor: ClientRole;
 }
 
 export interface MatchStartedMessage {
   type: "matchStarted";
   seat: PlayerSeat;
+  opponentRole: ClientRole;
   state: MatchSnapshot;
 }
 
@@ -122,8 +128,25 @@ export function parseClientMessage(raw: string): ClientMessage | null {
   }
 
   switch (parsed.type) {
-    case "joinLobby":
-      return { type: "joinLobby" };
+    case "joinLobby": {
+      if (!isClientRole(parsed.role)) {
+        return null;
+      }
+
+      const message: JoinLobbyMessage = { type: "joinLobby", role: parsed.role };
+
+      if (parsed.wantOpponent !== undefined) {
+        if (!isWantOpponent(parsed.wantOpponent)) return null;
+        message.wantOpponent = parsed.wantOpponent;
+      }
+
+      if (parsed.botToken !== undefined) {
+        if (typeof parsed.botToken !== "string") return null;
+        message.botToken = parsed.botToken;
+      }
+
+      return message;
+    }
     case "ping":
       return { type: "ping" };
     case "plantSeed":
@@ -148,28 +171,27 @@ export function parseServerMessage(raw: string): ServerMessage | null {
     case "welcome":
       return isPlayerSeat(parsed.seat) ? { type: "welcome", seat: parsed.seat } : null;
     case "lobbyUpdate":
-      if (
-        typeof parsed.playersConnected !== "number" ||
-        typeof parsed.requiredPlayers !== "number" ||
-        typeof parsed.ready !== "boolean"
-      ) {
+      if (!isClientRole(parsed.waitingFor)) {
         return null;
       }
 
       return {
         type: "lobbyUpdate",
-        playersConnected: parsed.playersConnected,
-        requiredPlayers: parsed.requiredPlayers,
-        ready: parsed.ready,
+        waitingFor: parsed.waitingFor,
       };
     case "matchStarted":
-      if (!isPlayerSeat(parsed.seat) || !isMatchSnapshot(parsed.state)) {
+      if (
+        !isPlayerSeat(parsed.seat) ||
+        !isClientRole(parsed.opponentRole) ||
+        !isMatchSnapshot(parsed.state)
+      ) {
         return null;
       }
 
       return {
         type: "matchStarted",
         seat: parsed.seat,
+        opponentRole: parsed.opponentRole,
         state: parsed.state,
       };
     case "stateUpdate":
@@ -219,6 +241,14 @@ function safeParse(raw: string): unknown {
 
 function isPlayerSeat(value: unknown): value is PlayerSeat {
   return value === "player1" || value === "player2";
+}
+
+function isClientRole(value: unknown): value is ClientRole {
+  return value === "human" || value === "bot";
+}
+
+function isWantOpponent(value: unknown): value is WantOpponent {
+  return value === "human" || value === "ai";
 }
 
 function isMatchEndReason(value: unknown): value is MatchEndReason {

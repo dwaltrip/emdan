@@ -82,6 +82,8 @@ function createDefaultInputState(width: number, height: number): InputState {
     game: createDefaultGameState(width, height),
     ui: createDefaultUIState(),
     connectionStatus: DEFAULT_CONNECTION_STATUS,
+    waitingFor: null,
+    opponentRole: null,
   };
 }
 

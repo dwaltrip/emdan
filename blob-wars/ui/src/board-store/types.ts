@@ -1,4 +1,4 @@
-import type { MatchPhase, PlayerSeat, PlayerState, TileOrigin, TileState, TileTerrain } from '@shared/protocol';
+import type { ClientRole, MatchPhase, PlayerSeat, PlayerState, TileOrigin, TileState, TileTerrain } from '@shared/protocol';
 
 type PlayerId = PlayerSeat;
 
@@ -33,6 +33,8 @@ interface InputState {
   game: SourceState;
   ui: UIState;
   connectionStatus: ConnectionStatus;
+  waitingFor: ClientRole | null;
+  opponentRole: ClientRole | null;
 }
 
 interface DerivedState {

@@ -2,6 +2,7 @@ import {
   GROWTH_EVERY_TICKS,
   TICK_INTERVAL_MS,
   type ClientMessage,
+  type ClientRole,
   type MatchEndReason,
   type MatchSnapshot,
   type MatchWinner,
@@ -11,19 +12,24 @@ import {
 import { otherSeat } from "./board";
 import { GameEngine } from "./engine";
 
+export type MatchId = string;
+
 interface MatchOptions {
+  id: MatchId;
   clientIds: Record<PlayerSeat, string>;
+  roles: Record<PlayerSeat, ClientRole>;
   send: (seat: PlayerSeat, message: ServerMessage) => void;
   isConnected: (seat: PlayerSeat) => boolean;
-  onEnded: () => void;
+  onEnded: (matchId: MatchId) => void;
 }
 
 const VERBOSE = process.env.VERBOSE === "1" || process.env.VERBOSE === "true";
 
 export class Match {
-  readonly id: string;
+  readonly id: MatchId;
 
   private readonly clientIds: Record<PlayerSeat, string>;
+  private readonly roles: Record<PlayerSeat, ClientRole>;
   private readonly send: MatchOptions["send"];
   private readonly isConnected: MatchOptions["isConnected"];
   private readonly onEnded: MatchOptions["onEnded"];
@@ -33,8 +39,9 @@ export class Match {
   private ended = false;
 
   constructor(options: MatchOptions) {
-    this.id = `match-${Date.now()}`;
+    this.id = options.id;
     this.clientIds = options.clientIds;
+    this.roles = options.roles;
     this.send = options.send;
     this.isConnected = options.isConnected;
     this.onEnded = options.onEnded;
@@ -44,6 +51,7 @@ export class Match {
     this.sendToAll((seat) => ({
       type: "matchStarted",
       seat,
+      opponentRole: this.roles[otherSeat(seat)],
       state: this.buildSnapshotFor(seat),
     }));
   }
@@ -144,7 +152,7 @@ export class Match {
       state: this.buildSnapshotFor(seat),
     }));
 
-    this.onEnded();
+    this.onEnded(this.id);
   }
 
   private buildSnapshotFor(seat: PlayerSeat): MatchSnapshot {

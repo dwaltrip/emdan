@@ -6,6 +6,7 @@ import { GRID_HEIGHT, GRID_WIDTH } from "@shared/protocol";
 import type { SourceState } from "@/board-store";
 import { BoardCanvas } from "@/board-canvas/board-canvas";
 import { useMatchId } from "@/hooks/use-match-id";
+import { useOpponentRole } from "@/hooks/use-opponent-role";
 import type { Session } from "@/session/session";
 
 import "./match-content.css";
@@ -38,14 +39,18 @@ function MatchDetails({ session }: MatchDetailsProps) {
   // per tick. Returns the version primitive so React's dev warning about an
   // unstable getSnapshot result doesn't fire.
   useSyncExternalStore(session.store.subscribe, () => session.store.version);
+  const opponentRole = useOpponentRole(session);
   const { game } = session.store.state;
   const seat = game.currentUser.seat;
   if (seat === null) return null;
+
+  const opponentLabel = opponentRole === "bot" ? "vs AI" : opponentRole === "human" ? "vs Human" : null;
 
   return (
     <div className="match-details">
       <div className="match-meta">
         <span>Match: {game.matchId}</span>
+        {opponentLabel && <span>{opponentLabel}</span>}
         <span>Tick: {game.tick}</span>
         <span>{describePhase(game, seat)}</span>
       </div>

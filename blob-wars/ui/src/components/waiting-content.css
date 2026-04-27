@@ -1,0 +1,20 @@
+.waiting-panel {
+  flex: 1;
+  display: grid;
+  gap: 16px;
+  place-content: center;
+  justify-items: center;
+  text-align: center;
+}
+
+.waiting-title {
+  margin: 0;
+  font-size: 28px;
+  letter-spacing: 0.01em;
+}
+
+.waiting-hint {
+  margin: 0;
+  color: var(--text-m);
+  max-width: 360px;
+}

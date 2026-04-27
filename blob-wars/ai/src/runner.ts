@@ -12,6 +12,7 @@ import {
 import { blobWarsAI } from "@/blob-wars-ai";
 
 const WS_URL = process.env.AI_WS_URL ?? "ws://localhost:3002";
+const BOT_TOKEN = process.env.BOT_TOKEN || "bot-token-secret--dummy-value";
 const VERBOSE = process.env.VERBOSE === "1" || process.env.VERBOSE === "true";
 
 type AiState =
@@ -23,8 +24,8 @@ export function startAiPlayer(): void {
   const socket = new WebSocket(WS_URL);
 
   socket.on("open", () => {
-    console.log(`[ai-player] connected to ${WS_URL}, joining lobby`);
-    send({ type: "joinLobby" });
+    console.log(`[ai-player] connected to ${WS_URL}, joining lobby as bot`);
+    send({ type: "joinLobby", role: "bot", botToken: BOT_TOKEN });
   });
 
   socket.on("message", (raw) => {
@@ -68,10 +69,9 @@ export function startAiPlayer(): void {
 
       case "matchEnded":
         console.log(
-          `[ai-player] match ended: reason=${msg.reason}, winner=${msg.winner}`,
+          `[ai-player] match ended: reason=${msg.reason}, winner=${msg.winner} — back to idle`,
         );
         state = { kind: "idle" };
-        socket.close();
         return;
     }
   }

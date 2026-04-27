@@ -13,6 +13,13 @@
   letter-spacing: 0.01em;
 }
 
+.join-lobby-buttons {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
 .join-lobby-button {
   border: 1px solid transparent;
   border-radius: 12px;
