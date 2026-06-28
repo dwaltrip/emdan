@@ -37,7 +37,7 @@ export function createRuntime(level: GeneratedLevel): Runtime {
     friction: 0.04,
     frictionAir: 0.005,
     label: 'ball',
-    restitution: 0.5,
+    restitution: 0.9,
   })
 
   Matter.Composite.add(engine.world, ball)
@@ -52,6 +52,7 @@ export function createRuntime(level: GeneratedLevel): Runtime {
     inkSegments: [],
     lastHudAt: 0,
     lastPointer: null,
+    pointerScreen: null,
     phase: 'running',
     pointerId: null,
     rafId: 0,

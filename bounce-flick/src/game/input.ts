@@ -1,9 +1,8 @@
 import {
   addInkSegment,
   clampDrawingPoint,
-  screenToWorld,
 } from './physics'
-import type { Runtime } from './types'
+import type { Point, Runtime } from './types'
 
 type PublishHud = (force?: boolean) => void
 
@@ -19,9 +18,11 @@ export function bindPointerControls(
 
     event.preventDefault()
     canvas.setPointerCapture(event.pointerId)
+    const pointerScreen = eventToCanvasPoint(canvas, event)
     runtime.pointerId = event.pointerId
+    runtime.pointerScreen = pointerScreen
     runtime.lastPointer = clampDrawingPoint(
-      screenToWorld(runtime, canvas, event.clientX, event.clientY),
+      canvasPointToWorld(runtime, pointerScreen),
     )
   }
 
@@ -31,8 +32,10 @@ export function bindPointerControls(
     }
 
     event.preventDefault()
+    const pointerScreen = eventToCanvasPoint(canvas, event)
+    runtime.pointerScreen = pointerScreen
     const target = clampDrawingPoint(
-      screenToWorld(runtime, canvas, event.clientX, event.clientY),
+      canvasPointToWorld(runtime, pointerScreen),
     )
     runtime.lastPointer = addInkSegment(runtime, runtime.lastPointer, target)
     publishHud(true)
@@ -49,6 +52,7 @@ export function bindPointerControls(
 
     runtime.pointerId = null
     runtime.lastPointer = null
+    runtime.pointerScreen = null
   }
 
   canvas.addEventListener('pointerdown', handlePointerDown)
@@ -61,5 +65,24 @@ export function bindPointerControls(
     canvas.removeEventListener('pointermove', handlePointerMove)
     canvas.removeEventListener('pointerup', endPointer)
     canvas.removeEventListener('pointercancel', endPointer)
+  }
+}
+
+function eventToCanvasPoint(
+  canvas: HTMLCanvasElement,
+  event: PointerEvent,
+): Point {
+  const bounds = canvas.getBoundingClientRect()
+
+  return {
+    x: event.clientX - bounds.left,
+    y: event.clientY - bounds.top,
+  }
+}
+
+function canvasPointToWorld(runtime: Runtime, point: Point): Point {
+  return {
+    x: point.x + runtime.cameraX,
+    y: point.y + runtime.cameraY,
   }
 }

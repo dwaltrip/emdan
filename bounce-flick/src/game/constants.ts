@@ -1,10 +1,9 @@
 import type { HudSnapshot } from './types'
 
 export const WORLD_WIDTH = 5200
-export const WORLD_HEIGHT = 1520
+export const WORLD_HEIGHT = 2600
 export const BALL_RADIUS = 20
 export const START_X = 140
-export const FINISH_X = 5030
 export const GRAVITY = 0.62
 export const MAX_INK = 170
 export const INK_RECHARGE_PER_SECOND = 64

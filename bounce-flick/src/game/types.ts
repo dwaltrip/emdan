@@ -21,7 +21,7 @@ export type InkSegment = {
   to: Point
 }
 
-export type HazardDirection = 'up' | 'left' | 'right'
+export type HazardDirection = 'up' | 'down' | 'left' | 'right' | 'wall'
 
 export type TerrainRole = 'ground' | 'hazard' | 'finish'
 
@@ -65,6 +65,7 @@ export type Runtime = {
   inkSegments: InkSegment[]
   lastHudAt: number
   lastPointer: Point | null
+  pointerScreen: Point | null
   phase: Phase
   pointerId: number | null
   rafId: number

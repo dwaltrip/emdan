@@ -6,6 +6,7 @@ import {
   WORLD_WIDTH,
 } from './constants'
 import { clamp } from './math'
+import { addInkSegment, clampDrawingPoint } from './physics'
 import type { HazardDirection, InkSegment, Runtime } from './types'
 
 export function resizeCanvas(
@@ -87,10 +88,8 @@ export function renderScene(
 }
 
 function updateCamera(runtime: Runtime) {
-  if (runtime.pointerId !== null) {
-    return
-  }
-
+  const previousCameraX = runtime.cameraX
+  const previousCameraY = runtime.cameraY
   const maxCameraX = Math.max(0, WORLD_WIDTH - runtime.viewportWidth)
   const targetX = clamp(
     runtime.ball.position.x - runtime.viewportWidth * 0.34,
@@ -106,6 +105,29 @@ function updateCamera(runtime: Runtime) {
 
   runtime.cameraX += (targetX - runtime.cameraX) * 0.09
   runtime.cameraY += (targetY - runtime.cameraY) * 0.11
+
+  dragActivePointer(runtime, previousCameraX, previousCameraY)
+}
+
+function dragActivePointer(
+  runtime: Runtime,
+  previousCameraX: number,
+  previousCameraY: number,
+) {
+  if (
+    runtime.pointerId === null ||
+    !runtime.lastPointer ||
+    !runtime.pointerScreen ||
+    (runtime.cameraX === previousCameraX && runtime.cameraY === previousCameraY)
+  ) {
+    return
+  }
+
+  const target = clampDrawingPoint({
+    x: runtime.pointerScreen.x + runtime.cameraX,
+    y: runtime.pointerScreen.y + runtime.cameraY,
+  })
+  runtime.lastPointer = addInkSegment(runtime, runtime.lastPointer, target)
 }
 
 function drawBody(
@@ -138,6 +160,11 @@ function drawHazard(
   stroke: string,
   direction: HazardDirection = 'up',
 ) {
+  if (direction === 'wall') {
+    drawBody(context, body, fill, stroke)
+    return
+  }
+
   const { min, max } = body.bounds
   const width = max.x - min.x
   const height = max.y - min.y
@@ -169,6 +196,9 @@ function drawHazard(
 
   const spikes = Math.max(4, Math.floor(width / 26))
   const spikeWidth = width / spikes
+  const pointsUp = direction !== 'down'
+  const baseY = pointsUp ? max.y - 6 : min.y + 6
+  const pointY = pointsUp ? min.y + 2 : max.y - 2
 
   context.fillStyle = fill
   context.strokeStyle = stroke
@@ -177,9 +207,9 @@ function drawHazard(
   for (let index = 0; index < spikes; index += 1) {
     const left = min.x + index * spikeWidth
     context.beginPath()
-    context.moveTo(left + spikeWidth * 0.08, max.y - 6)
-    context.lineTo(left + spikeWidth * 0.5, min.y + 2)
-    context.lineTo(left + spikeWidth * 0.92, max.y - 6)
+    context.moveTo(left + spikeWidth * 0.08, baseY)
+    context.lineTo(left + spikeWidth * 0.5, pointY)
+    context.lineTo(left + spikeWidth * 0.92, baseY)
     context.closePath()
     context.fill()
     context.stroke()
