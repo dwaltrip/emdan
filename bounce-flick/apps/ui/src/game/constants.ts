@@ -14,7 +14,7 @@ export const DRIVE_SPEED = 3.35
 export const DRIVE_ACCELERATION = 0.075
 export const MAX_SPEED = 9.4
 export const FIXED_STEP = 1000 / 60
-export const HAZARD_HEIGHT = 42
+export const WALL_THICKNESS = 42
 
 export const INITIAL_HUD: HudSnapshot = {
   ink: MAX_INK,

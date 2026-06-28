@@ -21,20 +21,38 @@ export type InkSegment = {
   to: Point
 }
 
-export type HazardDirection = 'up' | 'down' | 'left' | 'right' | 'wall'
+export type SpikeDirection = 'up' | 'down' | 'left' | 'right'
 
-export type TerrainRole = 'ground' | 'hazard' | 'finish'
+export type TerrainKind = 'wall' | 'object' | 'finish'
 
-export type TerrainSpec = {
+export type RectShape = {
   angle?: number
-  fill: string
-  hazardDirection?: HazardDirection
   height: number
-  role: TerrainRole
-  stroke: string
+  type: 'rect'
   width: number
   x: number
   y: number
+}
+
+export type PolylineShape = {
+  points: Point[]
+  thickness: number
+  type: 'polyline'
+}
+
+export type TerrainShape = PolylineShape | RectShape
+
+export type TerrainStyle = {
+  fill: string
+  spikes?: SpikeDirection
+  stroke: string
+}
+
+export type TerrainSpec = {
+  deadly: boolean
+  kind: TerrainKind
+  shape: TerrainShape
+  style: TerrainStyle
 }
 
 export type GeneratedLevel = {
@@ -44,11 +62,12 @@ export type GeneratedLevel = {
 }
 
 export type TerrainPiece = {
-  body: Matter.Body
-  fill: string
-  hazardDirection?: HazardDirection
-  role: TerrainRole
-  stroke: string
+  bodies: Matter.Body[]
+  bounds: Matter.Bounds
+  deadly: boolean
+  kind: TerrainKind
+  shape: TerrainShape
+  style: TerrainStyle
 }
 
 export type GameActions = {

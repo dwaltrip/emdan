@@ -1,20 +1,26 @@
-import * as Matter from 'matter-js'
 import {
   BALL_RADIUS,
-  HAZARD_HEIGHT,
   START_X,
+  WALL_THICKNESS,
   WORLD_HEIGHT,
   WORLD_WIDTH,
 } from './constants'
 import { clamp } from './math'
 import type {
   GeneratedLevel,
-  TerrainPiece,
+  Point,
+  TerrainShape,
   TerrainSpec,
 } from './types'
 
 type Random = () => number
 type Range = readonly [number, number]
+type RectBounds = {
+  height: number
+  width: number
+  x: number
+  y: number
+}
 
 type Platform = {
   fill: string
@@ -36,13 +42,11 @@ type FinishLanding = {
 }
 
 type Corridor = {
-  angle: number
   endX: number
   endY: number
   halfHeight: number
   length: number
-  normalX: number
-  normalY: number
+  path: Point[]
   startX: number
   startY: number
 }
@@ -67,8 +71,8 @@ const GROUND_FILLS = [
 ]
 
 const GROUND_STROKE = '#142f36'
-const HAZARD_FILL = '#e14d42'
-const HAZARD_STROKE = '#9b251f'
+const DEADLY_FILL = '#e14d42'
+const DEADLY_STROKE = '#9b251f'
 const FINISH_FILL = '#ffffff'
 const FINISH_STROKE = '#1b2a2e'
 const PLATFORM_HEIGHT = 60
@@ -78,6 +82,13 @@ const BOUNDARY_INSET = 46
 const CORRIDOR_HALF_HEIGHT = 260
 const CORRIDOR_START_BACKTRACK = 220
 const CORRIDOR_END_PADDING = 320
+const CORRIDOR_STEP_X: Range = [330, 620]
+const CORRIDOR_RANDOM_WALK_Y = 240
+const CORRIDOR_CANDIDATE_COUNT = 9
+const CORRIDOR_UPWARD_SOFT_LIMIT = 46
+const CORRIDOR_UPWARD_HARD_LIMIT = 150
+const CORRIDOR_UPWARD_PENALTY = 3.7
+const CORRIDOR_TARGET_PENALTY_Y = 210
 const FINISH_RIGHT_MARGIN = 170
 const FINISH_DISTANCE_X: Range = [
   3600,
@@ -85,7 +96,7 @@ const FINISH_DISTANCE_X: Range = [
 ]
 const FINISH_SURFACE_Y: Range = [
   2180,
-  WORLD_HEIGHT - CORRIDOR_HALF_HEIGHT - HAZARD_HEIGHT / 2 - BOUNDARY_INSET,
+  WORLD_HEIGHT - CORRIDOR_HALF_HEIGHT - WALL_THICKNESS / 2 - BOUNDARY_INSET,
 ]
 const MIN_FINISH_DROP_FROM_START = 1450
 const FINAL_PLATFORM_WIDTH: Range = [740, 1080]
@@ -103,19 +114,19 @@ const SCATTER_PLATFORM_CLEARANCE_X = 70
 const SCATTER_PLATFORM_CLEARANCE_Y = 150
 const SCATTER_PLATFORM_ATTEMPTS = 80
 const CORRIDOR_PLATFORM_MARGIN = 86
-const CORRIDOR_HAZARD_MARGIN = 72
-const HAZARD_COUNT: Range = [3, 6]
-const HAZARD_HORIZONTAL_WIDTH: Range = [110, 320]
-const HAZARD_VERTICAL_HEIGHT: Range = [110, 300]
-const HAZARD_START_MARGIN = 520
-const HAZARD_FINISH_MARGIN = 260
-const HAZARD_ATTEMPTS = 60
+const CORRIDOR_OBJECT_MARGIN = 72
+const DEADLY_OBJECT_COUNT: Range = [3, 6]
+const DEADLY_OBJECT_HORIZONTAL_WIDTH: Range = [110, 320]
+const DEADLY_OBJECT_VERTICAL_HEIGHT: Range = [110, 300]
+const DEADLY_OBJECT_START_MARGIN = 520
+const DEADLY_OBJECT_FINISH_MARGIN = 260
+const DEADLY_OBJECT_ATTEMPTS = 60
 
 export function generateLevel(random: Random = Math.random): GeneratedLevel {
   const startPlatform = createStartPlatform(random)
   const startSurfaceY = surfaceYAt(startPlatform, START_X)
   const finishLanding = createFinishLanding(startSurfaceY, random)
-  const corridor = createCorridor(startPlatform, finishLanding)
+  const corridor = createCorridor(startPlatform, finishLanding, random)
   const scatteredPlatforms = createScatteredPlatforms(
     random,
     startPlatform,
@@ -127,54 +138,38 @@ export function generateLevel(random: Random = Math.random): GeneratedLevel {
     ...scatteredPlatforms,
     finishLanding.platform,
   ]
-  const boundaryHazards = createBoundaryHazards(corridor)
-  const terrain: TerrainSpec[] = []
-
-  terrain.push(...platforms.map(platformToSpec))
-  terrain.push(...boundaryHazards)
-  terrain.push(
-    ...createScatteredHazards(
+  const boundaryWalls = createBoundaryWalls(corridor)
+  const terrain: TerrainSpec[] = [
+    ...platforms.map(platformToSpec),
+    ...boundaryWalls,
+    ...createScatteredObjects(
       random,
       platforms,
       finishLanding.goal,
-      boundaryHazards,
       corridor,
     ),
-  )
-  terrain.push({
-    fill: FINISH_FILL,
-    height: 220,
-    role: 'finish',
-    stroke: FINISH_STROKE,
-    width: 52,
-    x: finishLanding.goal.x,
-    y: surfaceYAt(finishLanding.platform, finishLanding.goal.x) - 100,
-  })
+    {
+      deadly: false,
+      kind: 'finish',
+      shape: {
+        height: 220,
+        type: 'rect',
+        width: 52,
+        x: finishLanding.goal.x,
+        y: finishLanding.goal.surfaceY - 100,
+      },
+      style: {
+        fill: FINISH_FILL,
+        stroke: FINISH_STROKE,
+      },
+    },
+  ]
 
   return {
     finishX: finishLanding.goal.x,
     startY: startSurfaceY - BALL_RADIUS - 24,
     terrain,
   }
-}
-
-export function createTerrain(engine: Matter.Engine, level: GeneratedLevel) {
-  const terrain: TerrainPiece[] = []
-
-  level.terrain.forEach((spec) => {
-    const body = createTerrainBody(spec)
-
-    terrain.push({
-      body,
-      fill: spec.fill,
-      hazardDirection: spec.hazardDirection,
-      role: spec.role,
-      stroke: spec.stroke,
-    })
-    Matter.Composite.add(engine.world, body)
-  })
-
-  return terrain
 }
 
 function createStartPlatform(random: Random): Platform {
@@ -325,18 +320,8 @@ function createScatteredPlatform(
   )
   const left = randomInt(random, minLeft, maxRight - width)
   const midX = left + width / 2
-  const descentProgress = clamp(
-    (midX - minLeft) / (maxRight - minLeft),
-    0,
-    1,
-  )
-  const descentY =
-    corridorCenterYAt(corridor, minLeft) +
-    (corridorCenterYAt(corridor, maxRight) -
-      corridorCenterYAt(corridor, minLeft)) *
-      descentProgress
   const leftTop = clamp(
-    descentY + randomInt(
+    corridorCenterYAt(corridor, midX) + randomInt(
       random,
       -SCATTER_PLATFORM_VERTICAL_JITTER,
       SCATTER_PLATFORM_VERTICAL_JITTER,
@@ -392,6 +377,7 @@ function isPlatformClear(
 function createCorridor(
   startPlatform: Platform,
   finishLanding: FinishLanding,
+  random: Random,
 ): Corridor {
   const startSurfaceY = surfaceYAt(startPlatform, START_X)
   const routeStartX = START_X - CORRIDOR_START_BACKTRACK
@@ -405,95 +391,268 @@ function createCorridor(
   const startY = startSurfaceY + slope * (routeStartX - START_X)
   const endY =
     finishLanding.goal.surfaceY + slope * (endX - finishLanding.goal.x)
-  const dx = endX - routeStartX
-  const dy = endY - startY
-  const length = Math.hypot(dx, dy)
-
-  return {
-    angle: Math.atan2(dy, dx),
+  const path = createCorridorPath(
+    random,
+    routeStartX,
+    startY,
+    finishLanding.goal.x,
+    finishLanding.goal.surfaceY,
     endX,
     endY,
+  )
+  const finalPoint = path[path.length - 1]
+
+  return {
+    endX,
+    endY: finalPoint.y,
     halfHeight: CORRIDOR_HALF_HEIGHT,
-    length,
-    normalX: -dy / length,
-    normalY: dx / length,
+    length: pathLength(path),
+    path,
     startX: routeStartX,
     startY,
   }
 }
 
-function createBoundaryHazards(corridor: Corridor): TerrainSpec[] {
+function createCorridorPath(
+  random: Random,
+  startX: number,
+  startY: number,
+  finishX: number,
+  finishY: number,
+  endX: number,
+  endY: number,
+) {
+  const minY = CORRIDOR_HALF_HEIGHT + WALL_THICKNESS + BOUNDARY_INSET
+  const maxY = WORLD_HEIGHT - CORRIDOR_HALF_HEIGHT - WALL_THICKNESS - BOUNDARY_INSET
+  const path: Point[] = [{ x: startX, y: clamp(startY, minY, maxY) }]
+
+  appendCorridorLeg(
+    random,
+    path,
+    { x: finishX, y: clamp(finishY, minY, maxY) },
+    minY,
+    maxY,
+  )
+  appendCorridorLeg(
+    random,
+    path,
+    { x: endX, y: clamp(endY, minY, maxY) },
+    minY,
+    maxY,
+  )
+
+  return path
+}
+
+function appendCorridorLeg(
+  random: Random,
+  path: Point[],
+  target: Point,
+  minY: number,
+  maxY: number,
+) {
+  let current = path[path.length - 1]
+
+  while (target.x - current.x > CORRIDOR_STEP_X[1]) {
+    const remainingX = target.x - current.x
+    const maxStep = Math.min(
+      CORRIDOR_STEP_X[1],
+      remainingX - CORRIDOR_STEP_X[0],
+    )
+    const minStep = Math.min(CORRIDOR_STEP_X[0], maxStep)
+    const x = current.x + randomInt(random, minStep, maxStep)
+    const next = chooseCorridorPoint(random, current, target, x, minY, maxY)
+
+    path.push(next)
+    current = next
+  }
+
+  if (
+    path[path.length - 1].x !== target.x ||
+    path[path.length - 1].y !== target.y
+  ) {
+    path.push(target)
+  }
+}
+
+function chooseCorridorPoint(
+  random: Random,
+  current: Point,
+  target: Point,
+  x: number,
+  minY: number,
+  maxY: number,
+) {
+  const progress = clamp((x - current.x) / (target.x - current.x), 0, 1)
+  const idealY = current.y + (target.y - current.y) * progress
+  const candidateMinY = Math.max(minY, current.y - CORRIDOR_UPWARD_HARD_LIMIT)
+  const candidateMaxY = Math.min(maxY, target.y + CORRIDOR_UPWARD_HARD_LIMIT)
+  const candidates: Array<Point & { weight: number }> = [
+    weightedCorridorPoint(
+      current,
+      target,
+      x,
+      clamp(idealY, candidateMinY, candidateMaxY),
+      idealY,
+    ),
+  ]
+
+  for (let index = 1; index < CORRIDOR_CANDIDATE_COUNT; index += 1) {
+    const y = clamp(
+      idealY +
+        randomInt(
+          random,
+          -CORRIDOR_RANDOM_WALK_Y,
+          CORRIDOR_RANDOM_WALK_Y,
+        ),
+      candidateMinY,
+      candidateMaxY,
+    )
+
+    candidates.push(weightedCorridorPoint(current, target, x, y, idealY))
+  }
+
+  return pickWeightedPoint(random, candidates)
+}
+
+function weightedCorridorPoint(
+  current: Point,
+  target: Point,
+  x: number,
+  y: number,
+  idealY: number,
+) {
+  const climb = Math.max(0, current.y - y)
+  const upwardExcess = Math.max(0, climb - CORRIDOR_UPWARD_SOFT_LIMIT)
+  const targetOvershoot = Math.max(
+    0,
+    y - target.y - CORRIDOR_UPWARD_SOFT_LIMIT,
+  )
+  const targetPenalty = Math.abs(y - idealY) / CORRIDOR_TARGET_PENALTY_Y
+  const upwardPenalty =
+    (upwardExcess / CORRIDOR_UPWARD_SOFT_LIMIT) *
+    CORRIDOR_UPWARD_PENALTY
+  const overshootPenalty =
+    (targetOvershoot / CORRIDOR_UPWARD_SOFT_LIMIT) *
+    CORRIDOR_UPWARD_PENALTY *
+    0.65
+
+  return {
+    weight: Math.exp(-(targetPenalty + upwardPenalty + overshootPenalty)),
+    x,
+    y,
+  }
+}
+
+function pickWeightedPoint(
+  random: Random,
+  candidates: Array<Point & { weight: number }>,
+): Point {
+  const totalWeight = candidates.reduce(
+    (total, candidate) => total + candidate.weight,
+    0,
+  )
+  let ticket = random() * totalWeight
+
+  for (const candidate of candidates) {
+    ticket -= candidate.weight
+
+    if (ticket <= 0) {
+      return { x: candidate.x, y: candidate.y }
+    }
+  }
+
+  const fallback = candidates[candidates.length - 1]
+
+  return { x: fallback.x, y: fallback.y }
+}
+
+function pathLength(path: Point[]) {
+  let length = 0
+
+  for (let index = 1; index < path.length; index += 1) {
+    length += distanceBetween(path[index - 1], path[index])
+  }
+
+  return length
+}
+
+function offsetPath(path: Point[], offset: number) {
+  return path.map((point, index) => {
+    const normal = pathPointNormal(path, index)
+
+    return {
+      x: point.x + normal.x * offset,
+      y: point.y + normal.y * offset,
+    }
+  })
+}
+
+function pathPointNormal(path: Point[], index: number) {
+  const previous = path[Math.max(0, index - 1)]
+  const next = path[Math.min(path.length - 1, index + 1)]
+  const dx = next.x - previous.x
+  const dy = next.y - previous.y
+  const length = Math.hypot(dx, dy) || 1
+
+  return {
+    x: -dy / length,
+    y: dx / length,
+  }
+}
+
+function distanceBetween(from: Point, to: Point) {
+  return Math.hypot(to.x - from.x, to.y - from.y)
+}
+
+function createBoundaryWalls(corridor: Corridor): TerrainSpec[] {
   return [
-    createCorridorSide(corridor, -1),
-    createCorridorSide(corridor, 1),
-    createCorridorCap(corridor, corridor.startX, corridor.startY),
-    createCorridorCap(corridor, corridor.endX, corridor.endY),
+    createCorridorWallSide(corridor, -1),
+    createCorridorWallSide(corridor, 1),
   ]
 }
 
-function createCorridorSide(
+function createCorridorWallSide(
   corridor: Corridor,
   side: -1 | 1,
 ): TerrainSpec {
-  const midX = (corridor.startX + corridor.endX) / 2
-  const midY = (corridor.startY + corridor.endY) / 2
-  const offset = side * corridor.halfHeight
-
   return {
-    fill: HAZARD_FILL,
-    hazardDirection: 'wall',
-    height: HAZARD_HEIGHT,
-    role: 'hazard',
-    stroke: HAZARD_STROKE,
-    width: corridor.length,
-    x: midX + corridor.normalX * offset,
-    y: midY + corridor.normalY * offset,
-    angle: corridor.angle,
+    deadly: false,
+    kind: 'wall',
+    shape: {
+      points: offsetPath(corridor.path, side * corridor.halfHeight),
+      thickness: WALL_THICKNESS,
+      type: 'polyline',
+    },
+    style: {
+      fill: DEADLY_FILL,
+      stroke: DEADLY_STROKE,
+    },
   }
 }
 
-function createCorridorCap(
-  corridor: Corridor,
-  x: number,
-  y: number,
-): TerrainSpec {
-  return {
-    fill: HAZARD_FILL,
-    hazardDirection: 'wall',
-    height: corridor.halfHeight * 2 + HAZARD_HEIGHT,
-    role: 'hazard',
-    stroke: HAZARD_STROKE,
-    width: HAZARD_HEIGHT,
-    x,
-    y,
-    angle: corridor.angle,
-  }
-}
-
-function createScatteredHazards(
+function createScatteredObjects(
   random: Random,
   platforms: Platform[],
   finishGoal: FinishGoal,
-  boundaryHazards: TerrainSpec[],
   corridor: Corridor,
 ): TerrainSpec[] {
-  const hazards: TerrainSpec[] = []
-  const count = randomInt(random, HAZARD_COUNT[0], HAZARD_COUNT[1])
-  const minX = START_X + HAZARD_START_MARGIN
-  const maxX = Math.max(minX, finishGoal.x - HAZARD_FINISH_MARGIN)
+  const objects: TerrainSpec[] = []
+  const count = randomInt(random, DEADLY_OBJECT_COUNT[0], DEADLY_OBJECT_COUNT[1])
+  const minX = START_X + DEADLY_OBJECT_START_MARGIN
+  const maxX = Math.max(minX, finishGoal.x - DEADLY_OBJECT_FINISH_MARGIN)
 
   for (
     let attempt = 0;
-    hazards.length < count && attempt < count * HAZARD_ATTEMPTS;
+    objects.length < count && attempt < count * DEADLY_OBJECT_ATTEMPTS;
     attempt += 1
   ) {
-    const hazard = createScatteredHazard(random, minX, maxX, corridor)
+    const object = createScatteredObject(random, minX, maxX, corridor)
 
     if (
-      !isHazardClear(
-        hazard,
-        hazards,
-        boundaryHazards,
+      !isObjectClear(
+        object,
+        objects,
         platforms,
         finishGoal,
         corridor,
@@ -502,13 +661,13 @@ function createScatteredHazards(
       continue
     }
 
-    hazards.push(hazard)
+    objects.push(object)
   }
 
-  return hazards
+  return objects
 }
 
-function createScatteredHazard(
+function createScatteredObject(
   random: Random,
   minX: number,
   maxX: number,
@@ -517,48 +676,61 @@ function createScatteredHazard(
   if (random() < 0.68) {
     const width = randomInt(
       random,
-      HAZARD_HORIZONTAL_WIDTH[0],
-      HAZARD_HORIZONTAL_WIDTH[1],
+      DEADLY_OBJECT_HORIZONTAL_WIDTH[0],
+      DEADLY_OBJECT_HORIZONTAL_WIDTH[1],
     )
-    const height = HAZARD_HEIGHT
+    const height = WALL_THICKNESS
     const x = randomInt(random, minX + width / 2, maxX - width / 2)
-    const y = randomHazardY(random, corridor, x, height)
+    const y = randomObjectY(random, corridor, x, height)
 
     return {
-      fill: HAZARD_FILL,
-      height,
-      role: 'hazard',
-      stroke: HAZARD_STROKE,
-      width,
-      x,
-      y,
+      deadly: true,
+      kind: 'object',
+      shape: {
+        height,
+        type: 'rect',
+        width,
+        x,
+        y,
+      },
+      style: {
+        fill: DEADLY_FILL,
+        spikes: 'up',
+        stroke: DEADLY_STROKE,
+      },
     }
   }
 
   const height = randomInt(
     random,
-    HAZARD_VERTICAL_HEIGHT[0],
-    HAZARD_VERTICAL_HEIGHT[1],
+    DEADLY_OBJECT_VERTICAL_HEIGHT[0],
+    DEADLY_OBJECT_VERTICAL_HEIGHT[1],
   )
   const x = randomInt(
     random,
-    minX + HAZARD_HEIGHT / 2,
-    maxX - HAZARD_HEIGHT / 2,
+    minX + WALL_THICKNESS / 2,
+    maxX - WALL_THICKNESS / 2,
   )
 
   return {
-    fill: HAZARD_FILL,
-    hazardDirection: random() < 0.5 ? 'left' : 'right',
-    height,
-    role: 'hazard',
-    stroke: HAZARD_STROKE,
-    width: HAZARD_HEIGHT,
-    x,
-    y: randomHazardY(random, corridor, x, height),
+    deadly: true,
+    kind: 'object',
+    shape: {
+      height,
+      type: 'rect',
+      width: WALL_THICKNESS,
+      x,
+      y: randomObjectY(random, corridor, x, height),
+    },
+    style: {
+      fill: DEADLY_FILL,
+      spikes: random() < 0.5 ? 'left' : 'right',
+      stroke: DEADLY_STROKE,
+    },
   }
 }
 
-function randomHazardY(
+function randomObjectY(
   random: Random,
   corridor: Corridor,
   x: number,
@@ -566,38 +738,39 @@ function randomHazardY(
 ) {
   const spread = Math.max(
     0,
-    corridor.halfHeight - CORRIDOR_HAZARD_MARGIN - height / 2,
+    corridor.halfHeight - CORRIDOR_OBJECT_MARGIN - height / 2,
   )
 
   return corridorCenterYAt(corridor, x) + randomInt(random, -spread, spread)
 }
 
-function isHazardClear(
+function isObjectClear(
   candidate: TerrainSpec,
-  hazards: TerrainSpec[],
-  boundaryHazards: TerrainSpec[],
+  objects: TerrainSpec[],
   platforms: Platform[],
   finishGoal: FinishGoal,
   corridor: Corridor,
 ) {
+  const candidateBounds = shapeBounds(candidate.shape)
+
   if (
-    Math.abs(candidate.x - finishGoal.x) < HAZARD_FINISH_MARGIN &&
-    Math.abs(candidate.y - finishGoal.surfaceY) < 230
+    Math.abs(candidateBounds.x - finishGoal.x) < DEADLY_OBJECT_FINISH_MARGIN &&
+    Math.abs(candidateBounds.y - finishGoal.surfaceY) < 230
   ) {
     return false
   }
 
   return (
-    isHazardInsideCorridor(candidate, corridor) &&
-    hazards.every((hazard) => !rectsOverlap(candidate, hazard, 80)) &&
-    boundaryHazards.every(
-      (hazard) => !rectsOverlap(candidate, hazard, BOUNDARY_INSET),
+    isObjectInsideCorridor(candidate, corridor) &&
+    objects.every(
+      (object) => !rectsOverlap(candidateBounds, shapeBounds(object.shape), 80),
     ) &&
-    platforms.every((platform) => !hazardOverlapsPlatform(candidate, platform))
+    platforms.every((platform) => !objectOverlapsPlatform(candidate, platform))
   )
 }
 
-function hazardOverlapsPlatform(hazard: TerrainSpec, platform: Platform) {
+function objectOverlapsPlatform(object: TerrainSpec, platform: Platform) {
+  const objectBounds = shapeBounds(object.shape)
   const platformTop = Math.min(platform.leftTop, platform.rightTop) - 60
   const platformBottom =
     Math.max(platform.leftTop, platform.rightTop) + platform.height + 60
@@ -608,7 +781,7 @@ function hazardOverlapsPlatform(hazard: TerrainSpec, platform: Platform) {
     y: (platformTop + platformBottom) / 2,
   }
 
-  return rectsOverlap(hazard, platformRect, 0)
+  return rectsOverlap(objectBounds, platformRect, 0)
 }
 
 function isPlatformInsideCorridor(platform: Platform, corridor: Corridor) {
@@ -624,18 +797,19 @@ function isPlatformInsideCorridor(platform: Platform, corridor: Corridor) {
   )
 }
 
-function isHazardInsideCorridor(hazard: TerrainSpec, corridor: Corridor) {
-  const halfWidth = hazard.width / 2
-  const halfHeight = hazard.height / 2
+function isObjectInsideCorridor(object: TerrainSpec, corridor: Corridor) {
+  const bounds = shapeBounds(object.shape)
+  const halfWidth = bounds.width / 2
+  const halfHeight = bounds.height / 2
   const points = [
-    { x: hazard.x - halfWidth, y: hazard.y - halfHeight },
-    { x: hazard.x + halfWidth, y: hazard.y - halfHeight },
-    { x: hazard.x - halfWidth, y: hazard.y + halfHeight },
-    { x: hazard.x + halfWidth, y: hazard.y + halfHeight },
+    { x: bounds.x - halfWidth, y: bounds.y - halfHeight },
+    { x: bounds.x + halfWidth, y: bounds.y - halfHeight },
+    { x: bounds.x - halfWidth, y: bounds.y + halfHeight },
+    { x: bounds.x + halfWidth, y: bounds.y + halfHeight },
   ]
 
   return points.every((point) =>
-    isPointInsideCorridor(point.x, point.y, corridor, CORRIDOR_HAZARD_MARGIN),
+    isPointInsideCorridor(point.x, point.y, corridor, CORRIDOR_OBJECT_MARGIN),
   )
 }
 
@@ -645,45 +819,123 @@ function isPointInsideCorridor(
   corridor: Corridor,
   margin: number,
 ) {
+  if (x < corridor.startX || x > corridor.endX) {
+    return false
+  }
+
+  const sample = nearestCorridorSample(corridor, x, y)
+
   return (
-    corridorProgressAt(corridor, x, y) >= 0 &&
-    corridorProgressAt(corridor, x, y) <= 1 &&
-    Math.abs(corridorSignedDistanceAt(corridor, x, y)) <=
-      corridor.halfHeight - margin
+    sample.progress >= 0 &&
+    sample.progress <= 1 &&
+    Math.abs(sample.signedDistance) <= corridor.halfHeight - margin
   )
 }
 
 function corridorCenterYAt(corridor: Corridor, x: number) {
-  const progress = clamp(
-    (x - corridor.startX) / (corridor.endX - corridor.startX),
-    0,
-    1,
-  )
+  const path = corridor.path
 
-  return corridor.startY + (corridor.endY - corridor.startY) * progress
+  if (x <= path[0].x) {
+    return path[0].y
+  }
+
+  for (let index = 1; index < path.length; index += 1) {
+    const from = path[index - 1]
+    const to = path[index]
+
+    if (x <= to.x) {
+      const progress = clamp((x - from.x) / (to.x - from.x), 0, 1)
+
+      return from.y + (to.y - from.y) * progress
+    }
+  }
+
+  return path[path.length - 1].y
 }
 
-function corridorProgressAt(corridor: Corridor, x: number, y: number) {
-  const dx = x - corridor.startX
-  const dy = y - corridor.startY
+function shapeBounds(shape: TerrainShape): RectBounds {
+  if (shape.type === 'rect') {
+    return shape
+  }
 
-  return (
-    (dx * (corridor.endX - corridor.startX) +
-      dy * (corridor.endY - corridor.startY)) /
-    (corridor.length * corridor.length)
-  )
+  if (shape.points.length === 0) {
+    return {
+      height: 0,
+      width: 0,
+      x: 0,
+      y: 0,
+    }
+  }
+
+  const halfThickness = shape.thickness / 2
+  let minX = Number.POSITIVE_INFINITY
+  let minY = Number.POSITIVE_INFINITY
+  let maxX = Number.NEGATIVE_INFINITY
+  let maxY = Number.NEGATIVE_INFINITY
+
+  shape.points.forEach((point) => {
+    minX = Math.min(minX, point.x - halfThickness)
+    minY = Math.min(minY, point.y - halfThickness)
+    maxX = Math.max(maxX, point.x + halfThickness)
+    maxY = Math.max(maxY, point.y + halfThickness)
+  })
+
+  return {
+    height: maxY - minY,
+    width: maxX - minX,
+    x: (minX + maxX) / 2,
+    y: (minY + maxY) / 2,
+  }
 }
 
-function corridorSignedDistanceAt(corridor: Corridor, x: number, y: number) {
-  return (
-    (x - corridor.startX) * corridor.normalX +
-    (y - corridor.startY) * corridor.normalY
-  )
+function nearestCorridorSample(corridor: Corridor, x: number, y: number) {
+  let bestDistance = Number.POSITIVE_INFINITY
+  let bestSignedDistance = 0
+  let bestLengthAt = 0
+  let traveled = 0
+
+  for (let index = 1; index < corridor.path.length; index += 1) {
+    const from = corridor.path[index - 1]
+    const to = corridor.path[index]
+    const dx = to.x - from.x
+    const dy = to.y - from.y
+    const segmentLength = Math.hypot(dx, dy)
+    const segmentLengthSquared = segmentLength * segmentLength
+
+    if (segmentLengthSquared === 0) {
+      continue
+    }
+
+    const progress = clamp(
+      ((x - from.x) * dx + (y - from.y) * dy) / segmentLengthSquared,
+      0,
+      1,
+    )
+    const nearestX = from.x + dx * progress
+    const nearestY = from.y + dy * progress
+    const distance = Math.hypot(x - nearestX, y - nearestY)
+
+    if (distance < bestDistance) {
+      const normalX = -dy / segmentLength
+      const normalY = dx / segmentLength
+
+      bestDistance = distance
+      bestSignedDistance = (x - nearestX) * normalX + (y - nearestY) * normalY
+      bestLengthAt = traveled + segmentLength * progress
+    }
+
+    traveled += segmentLength
+  }
+
+  return {
+    progress: bestLengthAt / corridor.length,
+    signedDistance: bestSignedDistance,
+  }
 }
 
 function rectsOverlap(
-  a: Pick<TerrainSpec, 'height' | 'width' | 'x' | 'y'>,
-  b: Pick<TerrainSpec, 'height' | 'width' | 'x' | 'y'>,
+  a: RectBounds,
+  b: RectBounds,
   padding: number,
 ) {
   return (
@@ -706,35 +958,21 @@ function platformToSpec(platform: Platform): TerrainSpec {
   const halfHeight = platform.height / 2
 
   return {
-    angle,
-    fill: platform.fill,
-    height: platform.height,
-    role: 'ground',
-    stroke: GROUND_STROKE,
-    width: length,
-    x: surfaceMidX - Math.sin(angle) * halfHeight,
-    y: surfaceMidY + Math.cos(angle) * halfHeight,
+    deadly: false,
+    kind: 'object',
+    shape: {
+      angle,
+      height: platform.height,
+      type: 'rect',
+      width: length,
+      x: surfaceMidX - Math.sin(angle) * halfHeight,
+      y: surfaceMidY + Math.cos(angle) * halfHeight,
+    },
+    style: {
+      fill: platform.fill,
+      stroke: GROUND_STROKE,
+    },
   }
-}
-
-function createTerrainBody(spec: TerrainSpec) {
-  if (spec.role === 'hazard' || spec.role === 'finish') {
-    return Matter.Bodies.rectangle(spec.x, spec.y, spec.width, spec.height, {
-      angle: spec.angle ?? 0,
-      isSensor: true,
-      isStatic: true,
-      label: spec.role,
-    })
-  }
-
-  return Matter.Bodies.rectangle(spec.x, spec.y, spec.width, spec.height, {
-    angle: spec.angle ?? 0,
-    chamfer: { radius: 12 },
-    friction: 0.92,
-    isStatic: true,
-    label: 'ground',
-    restitution: 0.03,
-  })
 }
 
 function surfaceYAt(platform: Platform, x: number) {

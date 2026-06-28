@@ -14,8 +14,8 @@ import {
   WORLD_HEIGHT,
   WORLD_WIDTH,
 } from './constants'
-import { createTerrain } from './level'
 import { clamp, distance } from './math'
+import { createTerrain } from './terrain'
 import type {
   GeneratedLevel,
   HudSnapshot,
@@ -82,7 +82,7 @@ export function createHudSnapshot(runtime: Runtime): HudSnapshot {
   }
 }
 
-export function setPhase(runtime: Runtime, phase: Phase) {
+function setPhase(runtime: Runtime, phase: Phase) {
   if (runtime.phase === phase) {
     return false
   }
@@ -99,7 +99,7 @@ export function setPhase(runtime: Runtime, phase: Phase) {
   return true
 }
 
-export function handleCollision(
+function handleCollision(
   runtime: Runtime,
   event: Matter.IEventCollision<Matter.Engine>,
 ) {
@@ -111,7 +111,7 @@ export function handleCollision(
       return
     }
 
-    if (labels.includes('hazard')) {
+    if (labels.includes('deadly')) {
       didChangePhase = setPhase(runtime, 'crashed') || didChangePhase
     }
 
@@ -192,19 +192,6 @@ export function tickPhysics(runtime: Runtime, seconds: number) {
   }
 
   return didChangePhase
-}
-
-export function screenToWorld(
-  runtime: Runtime,
-  canvas: HTMLCanvasElement,
-  clientX: number,
-  clientY: number,
-): Point {
-  const bounds = canvas.getBoundingClientRect()
-  return {
-    x: clientX - bounds.left + runtime.cameraX,
-    y: clientY - bounds.top + runtime.cameraY,
-  }
 }
 
 export function clampDrawingPoint(point: Point): Point {

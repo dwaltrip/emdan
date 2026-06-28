@@ -7,7 +7,13 @@ import {
 } from './constants'
 import { clamp } from './math'
 import { addInkSegment, clampDrawingPoint } from './physics'
-import type { HazardDirection, InkSegment, Runtime } from './types'
+import type {
+  InkSegment,
+  PolylineShape,
+  Runtime,
+  SpikeDirection,
+  TerrainStyle,
+} from './types'
 
 export function resizeCanvas(
   canvas: HTMLCanvasElement,
@@ -47,27 +53,34 @@ export function renderScene(
   const viewRight = runtime.cameraX + runtime.viewportWidth + 160
 
   runtime.terrain.forEach((piece) => {
-    if (piece.body.bounds.max.x < viewLeft || piece.body.bounds.min.x > viewRight) {
+    if (piece.bounds.max.x < viewLeft || piece.bounds.min.x > viewRight) {
       return
     }
 
-    if (piece.role === 'hazard') {
-      drawHazard(
+    if (piece.kind === 'finish') {
+      drawFinishGate(context, piece.bodies[0])
+      return
+    }
+
+    if (piece.shape.type === 'polyline') {
+      drawPolyline(context, piece.shape, piece.style)
+      return
+    }
+
+    if (piece.style.spikes) {
+      drawSpikes(
         context,
-        piece.body,
-        piece.fill,
-        piece.stroke,
-        piece.hazardDirection,
+        piece.bodies[0],
+        piece.style.fill,
+        piece.style.stroke,
+        piece.style.spikes,
       )
       return
     }
 
-    if (piece.role === 'finish') {
-      drawFinishGate(context, piece.body)
-      return
-    }
-
-    drawBody(context, piece.body, piece.fill, piece.stroke)
+    piece.bodies.forEach((body) => {
+      drawBody(context, body, piece.style.fill, piece.style.stroke)
+    })
   })
 
   runtime.inkSegments.forEach((segment) => {
@@ -153,18 +166,46 @@ function drawBody(
   context.stroke()
 }
 
-function drawHazard(
+function drawPolyline(
+  context: CanvasRenderingContext2D,
+  shape: PolylineShape,
+  style: TerrainStyle,
+) {
+  if (shape.points.length < 2) {
+    return
+  }
+
+  context.save()
+  context.lineCap = 'round'
+  context.lineJoin = 'round'
+
+  context.beginPath()
+  shape.points.forEach((point, index) => {
+    if (index === 0) {
+      context.moveTo(point.x, point.y)
+      return
+    }
+
+    context.lineTo(point.x, point.y)
+  })
+
+  context.lineWidth = shape.thickness + 4
+  context.strokeStyle = style.stroke
+  context.stroke()
+
+  context.lineWidth = shape.thickness
+  context.strokeStyle = style.fill
+  context.stroke()
+  context.restore()
+}
+
+function drawSpikes(
   context: CanvasRenderingContext2D,
   body: Matter.Body,
   fill: string,
   stroke: string,
-  direction: HazardDirection = 'up',
+  direction: SpikeDirection,
 ) {
-  if (direction === 'wall') {
-    drawBody(context, body, fill, stroke)
-    return
-  }
-
   const { min, max } = body.bounds
   const width = max.x - min.x
   const height = max.y - min.y
