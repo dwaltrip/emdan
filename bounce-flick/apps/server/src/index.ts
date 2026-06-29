@@ -32,7 +32,7 @@ websocketServer.on('connection', (socket) => {
         socket.send(
           serializeServerMessage({
             type: 'error',
-            code: 'invalid_message',
+            code: 'invalid-message',
             message: 'Could not parse the websocket payload.',
           }),
         )

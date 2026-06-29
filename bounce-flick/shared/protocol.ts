@@ -1,17 +1,26 @@
+import type { GeneratedLevel, TerrainShape, TerrainSpec } from './level'
+
+export type { GeneratedLevel } from './level'
+
 export type PlayerSeat = 'player1' | 'player2'
 export type MatchEndReason = 'disconnect'
 
 export const REQUIRED_PLAYERS = 2
 
 // client -> server
-export type ClientMessage = { type: 'joinLobby' }
+export type ClientMessage =
+  | { type: 'join-lobby' }
+  | { type: 'level-ready'; level: GeneratedLevel }
+  | { type: 'game-level-received' }
 
 // server -> client
 export type ServerMessage =
   | { type: 'welcome'; seat: PlayerSeat }
-  | { type: 'lobbyUpdate'; playersConnected: number; requiredPlayers: number; ready: boolean }
-  | { type: 'matchStarted'; seat: PlayerSeat }
-  | { type: 'matchEnded'; reason: MatchEndReason }
+  | { type: 'lobby-update'; playersConnected: number; requiredPlayers: number; ready: boolean }
+  | { type: 'generate-level-request' }
+  | { type: 'game-level'; level: GeneratedLevel }
+  | { type: 'start-game' }
+  | { type: 'match-ended'; reason: MatchEndReason }
   | { type: 'error'; code: string; message: string }
 
 export function serializeClientMessage(message: ClientMessage): string {
@@ -29,8 +38,12 @@ export function parseClientMessage(raw: string): ClientMessage | null {
   }
 
   switch (parsed.type) {
-    case 'joinLobby':
-      return { type: 'joinLobby' }
+    case 'join-lobby':
+      return { type: 'join-lobby' }
+    case 'level-ready':
+      return isGeneratedLevel(parsed.level) ? { type: 'level-ready', level: parsed.level } : null
+    case 'game-level-received':
+      return { type: 'game-level-received' }
     default:
       return null
   }
@@ -45,7 +58,7 @@ export function parseServerMessage(raw: string): ServerMessage | null {
   switch (parsed.type) {
     case 'welcome':
       return isSeat(parsed.seat) ? { type: 'welcome', seat: parsed.seat } : null
-    case 'lobbyUpdate':
+    case 'lobby-update':
       if (
         typeof parsed.playersConnected !== 'number' ||
         typeof parsed.requiredPlayers !== 'number' ||
@@ -54,15 +67,19 @@ export function parseServerMessage(raw: string): ServerMessage | null {
         return null
       }
       return {
-        type: 'lobbyUpdate',
+        type: 'lobby-update',
         playersConnected: parsed.playersConnected,
         requiredPlayers: parsed.requiredPlayers,
         ready: parsed.ready,
       }
-    case 'matchStarted':
-      return isSeat(parsed.seat) ? { type: 'matchStarted', seat: parsed.seat } : null
-    case 'matchEnded':
-      return parsed.reason === 'disconnect' ? { type: 'matchEnded', reason: 'disconnect' } : null
+    case 'generate-level-request':
+      return { type: 'generate-level-request' }
+    case 'game-level':
+      return isGeneratedLevel(parsed.level) ? { type: 'game-level', level: parsed.level } : null
+    case 'start-game':
+      return { type: 'start-game' }
+    case 'match-ended':
+      return parsed.reason === 'disconnect' ? { type: 'match-ended', reason: 'disconnect' } : null
     case 'error':
       if (typeof parsed.code !== 'string' || typeof parsed.message !== 'string') {
         return null
@@ -87,4 +104,31 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isSeat(value: unknown): value is PlayerSeat {
   return value === 'player1' || value === 'player2'
+}
+
+// Shallow validation: the level round-trips through JSON between our own
+// client and server, so we check the top-level shape and each terrain entry's
+// discriminants, not every nested field.
+function isGeneratedLevel(value: unknown): value is GeneratedLevel {
+  return (
+    isRecord(value) &&
+    typeof value.finishX === 'number' &&
+    typeof value.startY === 'number' &&
+    Array.isArray(value.terrain) &&
+    value.terrain.every(isTerrainSpec)
+  )
+}
+
+function isTerrainSpec(value: unknown): value is TerrainSpec {
+  return (
+    isRecord(value) &&
+    typeof value.deadly === 'boolean' &&
+    (value.kind === 'wall' || value.kind === 'object' || value.kind === 'finish') &&
+    isTerrainShape(value.shape) &&
+    isRecord(value.style)
+  )
+}
+
+function isTerrainShape(value: unknown): value is TerrainShape {
+  return isRecord(value) && (value.type === 'rect' || value.type === 'polyline')
 }

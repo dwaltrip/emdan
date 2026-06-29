@@ -6,8 +6,9 @@ interface MatchOptions {
   onEnded: () => void
 }
 
-// Matchmaking shell: owns the seat <-> client mapping and the match lifecycle.
-// In-match gameplay relay (per-frame ball updates) is added in a follow-up.
+// The running game: owns the seat <-> client mapping and forfeit-on-disconnect.
+// Created once the level handshake completes (see GlobalLobby). In-game gameplay
+// relay (per-frame ball updates) is added in a follow-up.
 export class Match {
   private readonly clientIds: Record<PlayerSeat, string>
   private readonly send: MatchOptions['send']
@@ -21,8 +22,8 @@ export class Match {
   }
 
   start(): void {
-    this.send('player1', { type: 'matchStarted', seat: 'player1' })
-    this.send('player2', { type: 'matchStarted', seat: 'player2' })
+    this.send('player1', { type: 'start-game' })
+    this.send('player2', { type: 'start-game' })
   }
 
   hasClient(clientId: string): boolean {
@@ -35,8 +36,8 @@ export class Match {
     }
 
     this.ended = true
-    this.send('player1', { type: 'matchEnded', reason: 'disconnect' })
-    this.send('player2', { type: 'matchEnded', reason: 'disconnect' })
+    this.send('player1', { type: 'match-ended', reason: 'disconnect' })
+    this.send('player2', { type: 'match-ended', reason: 'disconnect' })
     this.onEnded()
   }
 }

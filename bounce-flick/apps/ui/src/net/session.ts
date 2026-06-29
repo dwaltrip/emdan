@@ -1,6 +1,6 @@
-import type { PlayerSeat, ServerMessage } from '@shared/protocol'
+import type { GeneratedLevel, PlayerSeat, ServerMessage } from '@shared/protocol'
 
-import { createGameSocket } from './game-socket'
+import { createGameSocket, type GameSocketHandle } from './game-socket'
 
 export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected'
 
@@ -14,6 +14,13 @@ export interface SessionState {
   status: ConnectionStatus
   seat: PlayerSeat | null
   lobby: LobbyStatus | null
+  // The agreed level: generated locally (player 1) or received (player 2).
+  level: GeneratedLevel | null
+  started: boolean
+}
+
+export interface SessionDeps {
+  generateLevel: () => GeneratedLevel
 }
 
 export interface Session {
@@ -23,11 +30,13 @@ export interface Session {
   end: () => void
 }
 
-export function createSession(url: string): Session {
+export function createSession(url: string, deps: SessionDeps): Session {
   let state: SessionState = {
     status: 'connecting',
     seat: null,
     lobby: null,
+    level: null,
+    started: false,
   }
   const listeners = new Set<() => void>()
 
@@ -38,12 +47,14 @@ export function createSession(url: string): Session {
     }
   }
 
+  let socket: GameSocketHandle
+
   function handleMessage(message: ServerMessage): void {
     switch (message.type) {
       case 'welcome':
-        // Seated in the queue; still waiting for an opponent to join.
+        setState({ seat: message.seat })
         return
-      case 'lobbyUpdate':
+      case 'lobby-update':
         setState({
           lobby: {
             playersConnected: message.playersConnected,
@@ -52,11 +63,23 @@ export function createSession(url: string): Session {
           },
         })
         return
-      case 'matchStarted':
-        setState({ seat: message.seat, lobby: null })
+      case 'generate-level-request': {
+        // Player 1: generate the level and send it back.
+        const level = deps.generateLevel()
+        setState({ level })
+        socket.send({ type: 'level-ready', level })
         return
-      case 'matchEnded':
-        setState({ seat: null })
+      }
+      case 'game-level':
+        // Player 2: adopt the level and acknowledge.
+        setState({ level: message.level })
+        socket.send({ type: 'game-level-received' })
+        return
+      case 'start-game':
+        setState({ started: true })
+        return
+      case 'match-ended':
+        setState({ seat: null, lobby: null, level: null, started: false })
         return
       case 'error':
         console.warn('[session] server error', message.code, message.message)
@@ -64,7 +87,7 @@ export function createSession(url: string): Session {
     }
   }
 
-  const socket = createGameSocket(url, {
+  socket = createGameSocket(url, {
     onOpen: () => setState({ status: 'connected' }),
     onClose: () => setState({ status: 'disconnected' }),
     onMessage: handleMessage,
@@ -78,7 +101,7 @@ export function createSession(url: string): Session {
         listeners.delete(listener)
       }
     },
-    joinLobby: () => socket.send({ type: 'joinLobby' }),
+    joinLobby: () => socket.send({ type: 'join-lobby' }),
     end: () => socket.close(),
   }
 }

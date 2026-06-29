@@ -1,3 +1,5 @@
+import { generateLevel } from '../game/level'
+
 import { createSession } from './session'
 
 const WS_URL =
@@ -5,8 +7,9 @@ const WS_URL =
   `ws://${window.location.hostname}:3002`
 
 // Module-level singleton: one socket that outlives any React mount. Nothing
-// imports this yet — the UI wiring lands alongside the ball-update follow-up.
-export const session = createSession(WS_URL)
+// imports this yet — the App wiring (join screen + starting the game with the
+// agreed level) is the next step.
+export const session = createSession(WS_URL, { generateLevel })
 
 if (import.meta.hot) {
   import.meta.hot.dispose(() => {

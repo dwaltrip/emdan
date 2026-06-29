@@ -3,6 +3,7 @@ import WebSocket from 'ws'
 import {
   REQUIRED_PLAYERS,
   type ClientMessage,
+  type GeneratedLevel,
   type PlayerSeat,
   type ServerMessage,
   serializeServerMessage,
@@ -11,9 +12,15 @@ import {
 import type { ClientConnection } from './connection'
 import { Match } from './match'
 
+// Single-active-match lobby. It also owns the pre-game level handshake:
+// player 1 (first joiner) generates the level while player 2 is still arriving;
+// once both are seated and the level is in hand, the server hands it to player 2
+// and starts the match on their ack.
 export class GlobalLobby {
   private readonly clients = new Map<string, ClientConnection>()
   private readonly waitingPlayers: ClientConnection[] = []
+  private pendingLevel: GeneratedLevel | null = null
+  private gameLevelSent = false
   private activeMatch: Match | null = null
 
   addConnection(client: ClientConnection): void {
@@ -41,18 +48,25 @@ export class GlobalLobby {
       return
     }
 
-    if (message.type === 'joinLobby') {
-      this.joinLobby(client)
-      return
+    switch (message.type) {
+      case 'join-lobby':
+        this.joinLobby(client)
+        return
+      case 'level-ready':
+        this.handleLevelReady(clientId, message.level)
+        return
+      case 'game-level-received':
+        this.handleGameLevelReceived(clientId)
+        return
     }
 
-    // In-match gameplay messages (ball updates) will be routed to the active
-    // match here in the ball-update follow-up.
+    // In-game messages (ball updates) will be routed to the active match here
+    // in the ball-update follow-up.
   }
 
   private joinLobby(client: ClientConnection): void {
     if (this.activeMatch && !this.activeMatch.hasClient(client.id)) {
-      this.sendError(client, 'match_in_progress', 'A match is already running. Try again when it ends.')
+      this.sendError(client, 'match-in-progress', 'A match is already running. Try again when it ends.')
       return
     }
 
@@ -62,7 +76,7 @@ export class GlobalLobby {
     }
 
     if (this.waitingPlayers.length >= REQUIRED_PLAYERS) {
-      this.sendError(client, 'lobby_full', 'The lobby is full.')
+      this.sendError(client, 'lobby-full', 'The lobby is full.')
       return
     }
 
@@ -70,11 +84,57 @@ export class GlobalLobby {
     this.waitingPlayers.push(client)
 
     this.send(client, { type: 'welcome', seat })
+
+    if (seat === 'player1') {
+      this.send(client, { type: 'generate-level-request' })
+    }
+
     this.broadcastLobbyUpdate()
 
-    if (this.waitingPlayers.length === REQUIRED_PLAYERS) {
-      this.startMatch()
+    if (seat === 'player2') {
+      this.maybeSendGameLevel()
     }
+  }
+
+  private handleLevelReady(clientId: string, level: GeneratedLevel): void {
+    if (this.activeMatch || this.pendingLevel) {
+      return
+    }
+
+    const generator = this.waitingPlayers[0]
+    if (!generator || generator.id !== clientId) {
+      return
+    }
+
+    this.pendingLevel = level
+    this.maybeSendGameLevel()
+  }
+
+  private maybeSendGameLevel(): void {
+    if (this.activeMatch || this.gameLevelSent || !this.pendingLevel) {
+      return
+    }
+
+    const player2 = this.waitingPlayers[1]
+    if (!player2) {
+      return
+    }
+
+    this.send(player2, { type: 'game-level', level: this.pendingLevel })
+    this.gameLevelSent = true
+  }
+
+  private handleGameLevelReceived(clientId: string): void {
+    if (this.activeMatch || !this.gameLevelSent) {
+      return
+    }
+
+    const player2 = this.waitingPlayers[1]
+    if (!player2 || player2.id !== clientId) {
+      return
+    }
+
+    this.startMatch()
   }
 
   private startMatch(): void {
@@ -84,6 +144,9 @@ export class GlobalLobby {
     }
 
     this.waitingPlayers.length = 0
+    this.pendingLevel = null
+    this.gameLevelSent = false
+
     const bySeat: Record<PlayerSeat, ClientConnection> = { player1, player2 }
     this.activeMatch = new Match({
       clientIds: { player1: player1.id, player2: player2.id },
@@ -102,7 +165,7 @@ export class GlobalLobby {
 
   private broadcastLobbyUpdate(): void {
     const message: ServerMessage = {
-      type: 'lobbyUpdate',
+      type: 'lobby-update',
       playersConnected: this.waitingPlayers.length,
       requiredPlayers: REQUIRED_PLAYERS,
       ready: this.waitingPlayers.length === REQUIRED_PLAYERS,
@@ -113,14 +176,23 @@ export class GlobalLobby {
     }
   }
 
+  // A disconnect during setup aborts the whole pending pairing: drop everyone
+  // and notify any partner, who must re-join. Keeps the player1/player2 seat
+  // ordering valid (the queue is always [], [p1], or [p1, p2]).
   private removeWaitingClient(clientId: string): void {
     const index = this.waitingPlayers.findIndex((player) => player.id === clientId)
     if (index === -1) {
       return
     }
 
-    this.waitingPlayers.splice(index, 1)
-    this.broadcastLobbyUpdate()
+    const partners = this.waitingPlayers.filter((player) => player.id !== clientId)
+    this.waitingPlayers.length = 0
+    this.pendingLevel = null
+    this.gameLevelSent = false
+
+    for (const partner of partners) {
+      this.send(partner, { type: 'match-ended', reason: 'disconnect' })
+    }
   }
 
   private isWaiting(clientId: string): boolean {

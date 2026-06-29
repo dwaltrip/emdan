@@ -1,11 +1,27 @@
 import type * as Matter from 'matter-js'
 
-export type Phase = 'running' | 'cleared' | 'crashed'
+import type {
+  Point,
+  TerrainKind,
+  TerrainShape,
+  TerrainStyle,
+} from '@shared/level'
 
-export type Point = {
-  x: number
-  y: number
-}
+// Serializable level types now live in shared/ (they travel over the wire).
+// Re-exported here so existing `from './types'` imports keep working.
+export type {
+  GeneratedLevel,
+  Point,
+  PolylineShape,
+  RectShape,
+  SpikeDirection,
+  TerrainKind,
+  TerrainShape,
+  TerrainSpec,
+  TerrainStyle,
+} from '@shared/level'
+
+export type Phase = 'running' | 'cleared' | 'crashed'
 
 export type HudSnapshot = {
   ink: number
@@ -19,46 +35,6 @@ export type InkSegment = {
   body: Matter.Body
   from: Point
   to: Point
-}
-
-export type SpikeDirection = 'up' | 'down' | 'left' | 'right'
-
-export type TerrainKind = 'wall' | 'object' | 'finish'
-
-export type RectShape = {
-  angle?: number
-  height: number
-  type: 'rect'
-  width: number
-  x: number
-  y: number
-}
-
-export type PolylineShape = {
-  points: Point[]
-  thickness: number
-  type: 'polyline'
-}
-
-export type TerrainShape = PolylineShape | RectShape
-
-export type TerrainStyle = {
-  fill: string
-  spikes?: SpikeDirection
-  stroke: string
-}
-
-export type TerrainSpec = {
-  deadly: boolean
-  kind: TerrainKind
-  shape: TerrainShape
-  style: TerrainStyle
-}
-
-export type GeneratedLevel = {
-  finishX: number
-  startY: number
-  terrain: TerrainSpec[]
 }
 
 export type TerrainPiece = {
