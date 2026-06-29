@@ -33,6 +33,7 @@ function GameRun({
     () => ({
       sendBall: session.sendBall,
       getOpponent: () => session.live.opponent,
+      reportFinish: session.reportFinish,
     }),
     [],
   )

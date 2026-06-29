@@ -63,6 +63,11 @@ export class GlobalLobby {
           this.activeMatch.handleBallUpdate(clientId, message.x, message.y)
         }
         return
+      case 'player-finished':
+        if (this.activeMatch?.hasClient(clientId)) {
+          this.activeMatch.handleFinished(clientId, message.elapsedMs)
+        }
+        return
     }
   }
 
@@ -193,7 +198,12 @@ export class GlobalLobby {
     this.gameLevelSent = false
 
     for (const partner of partners) {
-      this.send(partner, { type: 'match-ended', reason: 'disconnect' })
+      this.send(partner, {
+        type: 'match-ended',
+        reason: 'disconnect',
+        winner: null,
+        times: { player1: null, player2: null },
+      })
     }
   }
 

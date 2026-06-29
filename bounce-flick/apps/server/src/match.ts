@@ -1,4 +1,4 @@
-import type { BallPosition, PlayerSeat, ServerMessage } from '@shared/protocol'
+import type { BallPosition, MatchWinner, PlayerSeat, ServerMessage } from '@shared/protocol'
 
 interface MatchOptions {
   clientIds: Record<PlayerSeat, string>
@@ -14,6 +14,10 @@ export class Match {
   private readonly send: MatchOptions['send']
   private readonly onEnded: MatchOptions['onEnded']
   private readonly positions: Record<PlayerSeat, BallPosition | null> = {
+    player1: null,
+    player2: null,
+  }
+  private readonly finishTimes: Record<PlayerSeat, number | null> = {
     player1: null,
     player2: null,
   }
@@ -48,15 +52,56 @@ export class Match {
     this.broadcast()
   }
 
+  handleFinished(clientId: string, elapsedMs: number): void {
+    if (this.ended) {
+      return
+    }
+
+    const seat = this.seatOf(clientId)
+    if (!seat || this.finishTimes[seat] !== null) {
+      return
+    }
+
+    this.finishTimes[seat] = elapsedMs
+
+    // Wait for both to finish, then compare times.
+    if (this.finishTimes.player1 !== null && this.finishTimes.player2 !== null) {
+      this.finish('finished', this.decideWinner())
+    }
+  }
+
   handleDisconnect(clientId: string): void {
     if (this.ended || !this.hasClient(clientId)) {
       return
     }
 
+    this.finish('disconnect', null)
+  }
+
+  private finish(reason: 'finished' | 'disconnect', winner: MatchWinner | null): void {
+    if (this.ended) {
+      return
+    }
+
     this.ended = true
-    this.send('player1', { type: 'match-ended', reason: 'disconnect' })
-    this.send('player2', { type: 'match-ended', reason: 'disconnect' })
+    const message: ServerMessage = {
+      type: 'match-ended',
+      reason,
+      winner,
+      times: this.finishTimes,
+    }
+    this.send('player1', message)
+    this.send('player2', message)
     this.onEnded()
+  }
+
+  private decideWinner(): MatchWinner {
+    const p1 = this.finishTimes.player1
+    const p2 = this.finishTimes.player2
+    if (p1 === null || p2 === null || p1 === p2) {
+      return 'draw'
+    }
+    return p1 < p2 ? 'player1' : 'player2'
   }
 
   private broadcast(): void {

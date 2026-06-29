@@ -3,7 +3,8 @@ import type { GeneratedLevel, TerrainShape, TerrainSpec } from './level'
 export type { GeneratedLevel } from './level'
 
 export type PlayerSeat = 'player1' | 'player2'
-export type MatchEndReason = 'disconnect'
+export type MatchEndReason = 'finished' | 'disconnect'
+export type MatchWinner = PlayerSeat | 'draw'
 
 export interface BallPosition {
   x: number
@@ -18,6 +19,7 @@ export type ClientMessage =
   | { type: 'level-ready'; level: GeneratedLevel }
   | { type: 'game-level-received' }
   | { type: 'ball-update'; x: number; y: number }
+  | { type: 'player-finished'; elapsedMs: number }
 
 // server -> client
 export type ServerMessage =
@@ -27,7 +29,12 @@ export type ServerMessage =
   | { type: 'game-level'; level: GeneratedLevel }
   | { type: 'start-game' }
   | { type: 'state-update'; positions: Record<PlayerSeat, BallPosition | null> }
-  | { type: 'match-ended'; reason: MatchEndReason }
+  | {
+      type: 'match-ended'
+      reason: MatchEndReason
+      winner: MatchWinner | null
+      times: Record<PlayerSeat, number | null>
+    }
   | { type: 'error'; code: string; message: string }
 
 export function serializeClientMessage(message: ClientMessage): string {
@@ -54,6 +61,10 @@ export function parseClientMessage(raw: string): ClientMessage | null {
     case 'ball-update':
       return typeof parsed.x === 'number' && typeof parsed.y === 'number'
         ? { type: 'ball-update', x: parsed.x, y: parsed.y }
+        : null
+    case 'player-finished':
+      return typeof parsed.elapsedMs === 'number'
+        ? { type: 'player-finished', elapsedMs: parsed.elapsedMs }
         : null
     default:
       return null
@@ -94,7 +105,19 @@ export function parseServerMessage(raw: string): ServerMessage | null {
         ? { type: 'state-update', positions: parsed.positions }
         : null
     case 'match-ended':
-      return parsed.reason === 'disconnect' ? { type: 'match-ended', reason: 'disconnect' } : null
+      if (
+        !isMatchEndReason(parsed.reason) ||
+        !isMatchWinnerOrNull(parsed.winner) ||
+        !isTimes(parsed.times)
+      ) {
+        return null
+      }
+      return {
+        type: 'match-ended',
+        reason: parsed.reason,
+        winner: parsed.winner,
+        times: parsed.times,
+      }
     case 'error':
       if (typeof parsed.code !== 'string' || typeof parsed.message !== 'string') {
         return null
@@ -130,6 +153,22 @@ function isPositions(value: unknown): value is Record<PlayerSeat, BallPosition |
     isRecord(value) &&
     (value.player1 === null || isBallPosition(value.player1)) &&
     (value.player2 === null || isBallPosition(value.player2))
+  )
+}
+
+function isMatchEndReason(value: unknown): value is MatchEndReason {
+  return value === 'finished' || value === 'disconnect'
+}
+
+function isMatchWinnerOrNull(value: unknown): value is MatchWinner | null {
+  return value === null || value === 'draw' || isSeat(value)
+}
+
+function isTimes(value: unknown): value is Record<PlayerSeat, number | null> {
+  return (
+    isRecord(value) &&
+    (value.player1 === null || typeof value.player1 === 'number') &&
+    (value.player2 === null || typeof value.player2 === 'number')
   )
 }
 

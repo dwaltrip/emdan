@@ -1,4 +1,11 @@
-import type { BallPosition, GeneratedLevel, PlayerSeat, ServerMessage } from '@shared/protocol'
+import type {
+  BallPosition,
+  GeneratedLevel,
+  MatchEndReason,
+  MatchWinner,
+  PlayerSeat,
+  ServerMessage,
+} from '@shared/protocol'
 
 import { createGameSocket, type GameSocketHandle } from './game-socket'
 
@@ -10,6 +17,13 @@ export interface LobbyStatus {
   ready: boolean
 }
 
+export interface MatchResult {
+  reason: MatchEndReason
+  winner: MatchWinner | null
+  times: Record<PlayerSeat, number | null>
+  seat: PlayerSeat | null
+}
+
 export interface SessionState {
   status: ConnectionStatus
   seat: PlayerSeat | null
@@ -17,6 +31,7 @@ export interface SessionState {
   // The agreed level: generated locally (player 1) or received (player 2).
   level: GeneratedLevel | null
   started: boolean
+  result: MatchResult | null
 }
 
 // Non-reactive realtime channel: written by the message handler, read by the
@@ -37,6 +52,7 @@ export interface Session {
   // realtime hot path (non-reactive)
   live: LiveState
   sendBall: (x: number, y: number) => void
+  reportFinish: (elapsedMs: number) => void
 }
 
 export function createSession(url: string, deps: SessionDeps): Session {
@@ -46,6 +62,7 @@ export function createSession(url: string, deps: SessionDeps): Session {
     lobby: null,
     level: null,
     started: false,
+    result: null,
   }
   const listeners = new Set<() => void>()
   const live: LiveState = { opponent: null }
@@ -102,7 +119,18 @@ export function createSession(url: string, deps: SessionDeps): Session {
       }
       case 'match-ended':
         live.opponent = null
-        setState({ seat: null, lobby: null, level: null, started: false })
+        setState({
+          result: {
+            reason: message.reason,
+            winner: message.winner,
+            times: message.times,
+            seat: state.seat,
+          },
+          seat: null,
+          lobby: null,
+          level: null,
+          started: false,
+        })
         return
       case 'error':
         console.warn('[session] server error', message.code, message.message)
@@ -124,9 +152,13 @@ export function createSession(url: string, deps: SessionDeps): Session {
         listeners.delete(listener)
       }
     },
-    joinLobby: () => socket.send({ type: 'join-lobby' }),
+    joinLobby: () => {
+      setState({ result: null })
+      socket.send({ type: 'join-lobby' })
+    },
     end: () => socket.close(),
     live,
     sendBall: (x, y) => socket.send({ type: 'ball-update', x, y }),
+    reportFinish: (elapsedMs) => socket.send({ type: 'player-finished', elapsedMs }),
   }
 }
