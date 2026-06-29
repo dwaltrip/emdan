@@ -1,4 +1,4 @@
-import type { GeneratedLevel, PlayerSeat, ServerMessage } from '@shared/protocol'
+import type { BallPosition, GeneratedLevel, PlayerSeat, ServerMessage } from '@shared/protocol'
 
 import { createGameSocket, type GameSocketHandle } from './game-socket'
 
@@ -19,6 +19,12 @@ export interface SessionState {
   started: boolean
 }
 
+// Non-reactive realtime channel: written by the message handler, read by the
+// render loop. NOT part of SessionState — touching it never re-renders React.
+export interface LiveState {
+  opponent: BallPosition | null
+}
+
 export interface SessionDeps {
   generateLevel: () => GeneratedLevel
 }
@@ -28,6 +34,9 @@ export interface Session {
   subscribe: (listener: () => void) => () => void
   joinLobby: () => void
   end: () => void
+  // realtime hot path (non-reactive)
+  live: LiveState
+  sendBall: (x: number, y: number) => void
 }
 
 export function createSession(url: string, deps: SessionDeps): Session {
@@ -39,6 +48,13 @@ export function createSession(url: string, deps: SessionDeps): Session {
     started: false,
   }
   const listeners = new Set<() => void>()
+  const live: LiveState = { opponent: null }
+
+  function otherSeat(): PlayerSeat | null {
+    if (state.seat === 'player1') return 'player2'
+    if (state.seat === 'player2') return 'player1'
+    return null
+  }
 
   function setState(patch: Partial<SessionState>): void {
     state = { ...state, ...patch }
@@ -78,7 +94,14 @@ export function createSession(url: string, deps: SessionDeps): Session {
       case 'start-game':
         setState({ started: true })
         return
+      case 'state-update': {
+        // Hot path: bare assignment, no setState — never re-renders React.
+        const other = otherSeat()
+        live.opponent = other ? message.positions[other] : null
+        return
+      }
       case 'match-ended':
+        live.opponent = null
         setState({ seat: null, lobby: null, level: null, started: false })
         return
       case 'error':
@@ -103,5 +126,7 @@ export function createSession(url: string, deps: SessionDeps): Session {
     },
     joinLobby: () => socket.send({ type: 'join-lobby' }),
     end: () => socket.close(),
+    live,
+    sendBall: (x, y) => socket.send({ type: 'ball-update', x, y }),
   }
 }

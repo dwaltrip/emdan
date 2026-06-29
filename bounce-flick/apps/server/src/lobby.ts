@@ -58,10 +58,12 @@ export class GlobalLobby {
       case 'game-level-received':
         this.handleGameLevelReceived(clientId)
         return
+      case 'ball-update':
+        if (this.activeMatch?.hasClient(clientId)) {
+          this.activeMatch.handleBallUpdate(clientId, message.x, message.y)
+        }
+        return
     }
-
-    // In-game messages (ball updates) will be routed to the active match here
-    // in the ball-update follow-up.
   }
 
   private joinLobby(client: ClientConnection): void {

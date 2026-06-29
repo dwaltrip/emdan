@@ -13,6 +13,11 @@ import {
 import { renderScene, resizeCanvas } from '../game/renderer'
 import type { GameActions, GeneratedLevel, HudSnapshot } from '../game/types'
 
+type NetBridge = {
+  sendBall: (x: number, y: number) => void
+  getOpponent: () => { x: number; y: number } | null
+}
+
 type UseBounceFlickGameParams = {
   actionsRef: {
     current: GameActions | null
@@ -21,6 +26,7 @@ type UseBounceFlickGameParams = {
     current: HTMLCanvasElement | null
   }
   level: GeneratedLevel
+  net?: NetBridge
   setHud: (snapshot: HudSnapshot) => void
 }
 
@@ -28,6 +34,7 @@ export function useBounceFlickGame({
   actionsRef,
   canvasRef,
   level,
+  net,
   setHud,
 }: UseBounceFlickGameParams) {
   useEffect(() => {
@@ -73,6 +80,11 @@ export function useBounceFlickGame({
         accumulator -= FIXED_STEP
       }
 
+      if (net) {
+        runtime.opponent = net.getOpponent()
+        net.sendBall(runtime.ball.position.x, runtime.ball.position.y)
+      }
+
       renderScene(context, runtime)
       publishHud()
       runtime.rafId = window.requestAnimationFrame(frame)
@@ -110,5 +122,5 @@ export function useBounceFlickGame({
         actionsRef.current = null
       }
     }
-  }, [actionsRef, canvasRef, level, setHud])
+  }, [actionsRef, canvasRef, level, net, setHud])
 }

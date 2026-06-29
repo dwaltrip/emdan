@@ -5,6 +5,11 @@ export type { GeneratedLevel } from './level'
 export type PlayerSeat = 'player1' | 'player2'
 export type MatchEndReason = 'disconnect'
 
+export interface BallPosition {
+  x: number
+  y: number
+}
+
 export const REQUIRED_PLAYERS = 2
 
 // client -> server
@@ -12,6 +17,7 @@ export type ClientMessage =
   | { type: 'join-lobby' }
   | { type: 'level-ready'; level: GeneratedLevel }
   | { type: 'game-level-received' }
+  | { type: 'ball-update'; x: number; y: number }
 
 // server -> client
 export type ServerMessage =
@@ -20,6 +26,7 @@ export type ServerMessage =
   | { type: 'generate-level-request' }
   | { type: 'game-level'; level: GeneratedLevel }
   | { type: 'start-game' }
+  | { type: 'state-update'; positions: Record<PlayerSeat, BallPosition | null> }
   | { type: 'match-ended'; reason: MatchEndReason }
   | { type: 'error'; code: string; message: string }
 
@@ -44,6 +51,10 @@ export function parseClientMessage(raw: string): ClientMessage | null {
       return isGeneratedLevel(parsed.level) ? { type: 'level-ready', level: parsed.level } : null
     case 'game-level-received':
       return { type: 'game-level-received' }
+    case 'ball-update':
+      return typeof parsed.x === 'number' && typeof parsed.y === 'number'
+        ? { type: 'ball-update', x: parsed.x, y: parsed.y }
+        : null
     default:
       return null
   }
@@ -78,6 +89,10 @@ export function parseServerMessage(raw: string): ServerMessage | null {
       return isGeneratedLevel(parsed.level) ? { type: 'game-level', level: parsed.level } : null
     case 'start-game':
       return { type: 'start-game' }
+    case 'state-update':
+      return isPositions(parsed.positions)
+        ? { type: 'state-update', positions: parsed.positions }
+        : null
     case 'match-ended':
       return parsed.reason === 'disconnect' ? { type: 'match-ended', reason: 'disconnect' } : null
     case 'error':
@@ -104,6 +119,18 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isSeat(value: unknown): value is PlayerSeat {
   return value === 'player1' || value === 'player2'
+}
+
+function isBallPosition(value: unknown): value is BallPosition {
+  return isRecord(value) && typeof value.x === 'number' && typeof value.y === 'number'
+}
+
+function isPositions(value: unknown): value is Record<PlayerSeat, BallPosition | null> {
+  return (
+    isRecord(value) &&
+    (value.player1 === null || isBallPosition(value.player1)) &&
+    (value.player2 === null || isBallPosition(value.player2))
+  )
 }
 
 // Shallow validation: the level round-trips through JSON between our own

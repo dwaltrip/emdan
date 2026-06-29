@@ -53,6 +53,7 @@ export function createRuntime(level: GeneratedLevel): Runtime {
     inkSegments: [],
     lastHudAt: 0,
     lastPointer: null,
+    opponent: null,
     pointerScreen: null,
     phase: 'running',
     pointerId: null,

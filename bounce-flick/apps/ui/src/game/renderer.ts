@@ -92,6 +92,11 @@ export function renderScene(
   })
 
   drawBall(context, runtime.ball)
+
+  if (runtime.opponent) {
+    drawGhostBall(context, runtime.opponent.x, runtime.opponent.y)
+  }
+
   context.restore()
 
   if (runtime.phase !== 'running') {
@@ -354,6 +359,24 @@ function drawBall(context: CanvasRenderingContext2D, ball: Matter.Body) {
   context.beginPath()
   context.moveTo(-BALL_RADIUS * 0.8, -3)
   context.lineTo(BALL_RADIUS * 0.8, 3)
+  context.stroke()
+  context.restore()
+}
+
+function drawGhostBall(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+) {
+  context.save()
+  context.globalAlpha = 0.4
+  context.translate(x, y)
+  context.beginPath()
+  context.arc(0, 0, BALL_RADIUS, 0, Math.PI * 2)
+  context.fillStyle = '#9fb4bb'
+  context.fill()
+  context.lineWidth = 3
+  context.strokeStyle = 'rgba(31, 44, 47, 0.55)'
   context.stroke()
   context.restore()
 }

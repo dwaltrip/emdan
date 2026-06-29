@@ -1,8 +1,9 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 
 import { INITIAL_HUD } from '../game/constants'
 import type { GameActions, GeneratedLevel } from '../game/types'
 import { useBounceFlickGame } from '../hooks/useBounceFlickGame'
+import { session } from '../net/session-instance'
 import { GameHeader } from './GameHeader'
 import { GameStage } from './GameStage'
 
@@ -26,7 +27,17 @@ function GameRun({
   const actionsRef = useRef<GameActions | null>(null)
   const [hud, setHud] = useState(INITIAL_HUD)
 
-  useBounceFlickGame({ actionsRef, canvasRef, level, setHud })
+  // Stable per mount so it doesn't retrigger the game-loop effect. The opponent
+  // read is a bare getter — the hot path never goes through React.
+  const net = useMemo(
+    () => ({
+      sendBall: session.sendBall,
+      getOpponent: () => session.live.opponent,
+    }),
+    [],
+  )
+
+  useBounceFlickGame({ actionsRef, canvasRef, level, net, setHud })
 
   const clearDrawings = useCallback(() => {
     actionsRef.current?.clearDrawings()
