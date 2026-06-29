@@ -6,6 +6,57 @@ import type { Point, Runtime } from './types'
 
 type PublishHud = (force?: boolean) => void
 
+export function bindKeyboardControls(
+  runtime: Runtime,
+  onClearDrawings: () => void,
+) {
+  const handleKeyDown = (event: KeyboardEvent) => {
+    if (isEditableEventTarget(event.target)) {
+      return
+    }
+
+    if (event.code === 'Space') {
+      event.preventDefault()
+      runtime.cameraFrozen = true
+      return
+    }
+
+    if (
+      event.code === 'KeyC' &&
+      !event.repeat &&
+      !event.altKey &&
+      !event.ctrlKey &&
+      !event.metaKey
+    ) {
+      event.preventDefault()
+      onClearDrawings()
+    }
+  }
+
+  const handleKeyUp = (event: KeyboardEvent) => {
+    if (event.code !== 'Space') {
+      return
+    }
+
+    event.preventDefault()
+    runtime.cameraFrozen = false
+  }
+
+  const handleBlur = () => {
+    runtime.cameraFrozen = false
+  }
+
+  window.addEventListener('keydown', handleKeyDown)
+  window.addEventListener('keyup', handleKeyUp)
+  window.addEventListener('blur', handleBlur)
+
+  return () => {
+    window.removeEventListener('keydown', handleKeyDown)
+    window.removeEventListener('keyup', handleKeyUp)
+    window.removeEventListener('blur', handleBlur)
+  }
+}
+
 export function bindPointerControls(
   canvas: HTMLCanvasElement,
   runtime: Runtime,
@@ -85,4 +136,17 @@ function canvasPointToWorld(runtime: Runtime, point: Point): Point {
     x: point.x + runtime.cameraX,
     y: point.y + runtime.cameraY,
   }
+}
+
+function isEditableEventTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) {
+    return false
+  }
+
+  return (
+    target.isContentEditable ||
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLSelectElement ||
+    target instanceof HTMLTextAreaElement
+  )
 }

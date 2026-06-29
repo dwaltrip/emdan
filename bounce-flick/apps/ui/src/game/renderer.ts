@@ -101,6 +101,10 @@ export function renderScene(
 }
 
 function updateCamera(runtime: Runtime) {
+  if (runtime.cameraFrozen) {
+    return
+  }
+
   const previousCameraX = runtime.cameraX
   const previousCameraY = runtime.cameraY
   const maxCameraX = Math.max(0, WORLD_WIDTH - runtime.viewportWidth)
@@ -117,7 +121,10 @@ function updateCamera(runtime: Runtime) {
   )
 
   runtime.cameraX += (targetX - runtime.cameraX) * 0.09
-  runtime.cameraY += (targetY - runtime.cameraY) * 0.11
+
+  if (runtime.pointerId === null) {
+    runtime.cameraY += (targetY - runtime.cameraY) * 0.11
+  }
 
   dragActivePointer(runtime, previousCameraX, previousCameraY)
 }

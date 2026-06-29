@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { FIXED_STEP } from '../game/constants'
-import { bindPointerControls } from '../game/input'
+import { bindKeyboardControls, bindPointerControls } from '../game/input'
 import {
   bindCollisionHandlers,
   clearDrawings,
@@ -80,6 +80,10 @@ export function useBounceFlickGame({
 
     const resizeObserver = new ResizeObserver(resize)
     const cleanupInput = bindPointerControls(canvas, runtime, publishHud)
+    const cleanupKeyboard = bindKeyboardControls(runtime, () => {
+      clearDrawings(runtime)
+      publishHud(true)
+    })
     const cleanupCollisions = bindCollisionHandlers(runtime, () => {
       publishHud(true)
     })
@@ -99,6 +103,7 @@ export function useBounceFlickGame({
       window.cancelAnimationFrame(runtime.rafId)
       resizeObserver.disconnect()
       cleanupInput()
+      cleanupKeyboard()
       cleanupCollisions()
       destroyRuntime(runtime)
       if (actionsRef.current?.clearDrawings) {

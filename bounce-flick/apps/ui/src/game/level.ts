@@ -79,7 +79,7 @@ const PLATFORM_HEIGHT = 60
 const MIN_TRACK_TOP = 420
 const MAX_TRACK_TOP = WORLD_HEIGHT - 230
 const BOUNDARY_INSET = 46
-const CORRIDOR_HALF_HEIGHT = 260
+const CORRIDOR_HALF_HEIGHT = 320
 const CORRIDOR_START_BACKTRACK = 220
 const CORRIDOR_END_PADDING = 320
 const CORRIDOR_STEP_X: Range = [330, 620]
@@ -142,7 +142,7 @@ export function generateLevel(random: Random = Math.random): GeneratedLevel {
   const terrain: TerrainSpec[] = [
     ...platforms.map(platformToSpec),
     ...boundaryWalls,
-    ...createScatteredObjects(
+    ...createScatteredHazards(
       random,
       platforms,
       finishLanding.goal,
@@ -631,7 +631,7 @@ function createCorridorWallSide(
   }
 }
 
-function createScatteredObjects(
+function createScatteredHazards(
   random: Random,
   platforms: Platform[],
   finishGoal: FinishGoal,
@@ -647,7 +647,7 @@ function createScatteredObjects(
     objects.length < count && attempt < count * DEADLY_OBJECT_ATTEMPTS;
     attempt += 1
   ) {
-    const object = createScatteredObject(random, minX, maxX, corridor)
+    const object = createScatteredHazard(random, minX, maxX, corridor)
 
     if (
       !isObjectClear(
@@ -667,7 +667,7 @@ function createScatteredObjects(
   return objects
 }
 
-function createScatteredObject(
+function createScatteredHazard(
   random: Random,
   minX: number,
   maxX: number,

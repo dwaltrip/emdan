@@ -44,6 +44,7 @@ export function createRuntime(level: GeneratedLevel): Runtime {
 
   return {
     ball,
+    cameraFrozen: false,
     cameraX: 0,
     cameraY: clamp(level.startY - 560 * 0.44, 0, WORLD_HEIGHT - 560),
     engine,

@@ -76,6 +76,7 @@ export type GameActions = {
 
 export type Runtime = {
   ball: Matter.Body
+  cameraFrozen: boolean
   cameraX: number
   cameraY: number
   engine: Matter.Engine
