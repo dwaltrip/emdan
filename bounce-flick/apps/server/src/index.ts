@@ -1,4 +1,3 @@
-import { createServer } from 'node:http'
 import { randomUUID } from 'node:crypto'
 
 import WebSocket, { WebSocketServer, type RawData } from 'ws'
@@ -10,12 +9,7 @@ import { GlobalLobby } from './lobby'
 const PORT = Number.parseInt(process.env.PORT ?? '3002', 10)
 const lobby = new GlobalLobby()
 
-const httpServer = createServer((_request, response) => {
-  response.writeHead(200, { 'content-type': 'application/json' })
-  response.end(JSON.stringify({ service: 'bounce-flick-ws' }))
-})
-
-const websocketServer = new WebSocketServer({ server: httpServer })
+const websocketServer = new WebSocketServer({ port: PORT })
 
 websocketServer.on('connection', (socket) => {
   const client = {
@@ -48,7 +42,7 @@ websocketServer.on('connection', (socket) => {
   })
 })
 
-httpServer.listen(PORT, () => {
+websocketServer.on('listening', () => {
   console.log(`bounce-flick websocket server listening on :${PORT}`)
 })
 
