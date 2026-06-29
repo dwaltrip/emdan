@@ -6,6 +6,29 @@
   background: #f7f8fb;
 }
 
+.join-screen {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  color: #1f2c2f;
+  background: #f7f8fb;
+}
+
+.join-screen button {
+  min-height: 44px;
+  padding: 0 22px;
+  border: 1px solid #167f90;
+  border-radius: 8px;
+  background: #167f90;
+  color: #ffffff;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
 .game-topbar {
   display: grid;
   grid-template-columns: minmax(180px, auto) minmax(320px, 1fr) auto;
