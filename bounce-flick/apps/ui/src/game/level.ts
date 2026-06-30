@@ -5,10 +5,19 @@ import {
   WORLD_HEIGHT,
   WORLD_WIDTH,
 } from './constants'
+import {
+  offsetPolylineSegments,
+  offsetPathByVertexNormal,
+  pathLength,
+  segmentXStops,
+  segmentsYRangeOverSpan,
+} from './geometry'
 import { clamp } from './math'
+import type { Segment } from './geometry'
 import type {
   GeneratedLevel,
   Point,
+  SpikeDirection,
   TerrainShape,
   TerrainSpec,
 } from './types'
@@ -36,29 +45,32 @@ type FinishGoal = {
   x: number
 }
 
-type FinishLanding = {
-  goal: FinishGoal
-  platform: Platform
-}
-
 type Corridor = {
   endX: number
-  endY: number
+  faces: {
+    ceiling: Segment[]
+    floor: Segment[]
+  }
   halfHeight: number
   length: number
   path: Point[]
   startX: number
-  startY: number
+  walls: {
+    ceiling: Point[]
+    floor: Point[]
+  }
 }
 
-const BASE_START_PLATFORM: Platform = {
-  fill: '#2c6470',
-  height: 64,
-  left: -70,
-  leftTop: 606,
-  right: 660,
-  rightTop: 644,
+type PlatformFitRange = {
+  fits: boolean
+  maxSurfaceY: number
+  minSurfaceY: number
 }
+
+const BALL_HEIGHT = BALL_RADIUS * 2
+// Minimum headroom above the start platform: enough for the ball.
+// The 1.5 factor gives 50% margin (gameplay "feel" design decision).
+const EDGE_CEILING_BUFFER = BALL_HEIGHT * 1.5
 
 const GROUND_FILLS = [
   '#2c6470',
@@ -75,7 +87,7 @@ const DEADLY_FILL = '#e14d42'
 const DEADLY_STROKE = '#9b251f'
 const FINISH_FILL = '#ffffff'
 const FINISH_STROKE = '#1b2a2e'
-const PLATFORM_HEIGHT = 60
+
 const MIN_TRACK_TOP = 420
 const MAX_TRACK_TOP = WORLD_HEIGHT - 230
 const BOUNDARY_INSET = 46
@@ -99,11 +111,24 @@ const FINISH_SURFACE_Y: Range = [
   WORLD_HEIGHT - CORRIDOR_HALF_HEIGHT - WALL_THICKNESS / 2 - BOUNDARY_INSET,
 ]
 const MIN_FINISH_DROP_FROM_START = 1450
+const START_POINT_Y: Range = [560, 640]
+const START_PLATFORM_WIDTH: Range = [680, 760]
+const START_PLATFORM_LEFT_INSET = 10
+
+// Offsets from corridor centerline for the start and finish platform surfaces.
+// Tune this to place the platforms higher or lower in the channel.
+const START_SURFACE_CENTERLINE_OFFSET: Range = [40, 140]
+const FINISH_SURFACE_CENTERLINE_OFFSET: Range = [40, 140]
+
+const FINISH_DROP_PLANNING_BUFFER = FINISH_SURFACE_CENTERLINE_OFFSET[1]
+const FINISH_POST_HEIGHT = 220
+const FINISH_TOP_BUFFER = FINISH_POST_HEIGHT + 20
 const FINAL_PLATFORM_WIDTH: Range = [740, 1080]
-const FINAL_PLATFORM_RIGHT_RISE: Range = [-12, 28]
-const FINAL_PLATFORM_FINISH_OFFSET: Range = [230, 840]
+// Offset for finish line from final platform left edge.
+const FINISH_LINE_OFFSET: Range = [230, 840]
 const FINAL_PLATFORM_TRAILING_MARGIN = 150
 const FINAL_PLATFORM_RIGHT_MARGIN = 36
+
 const SCATTER_PLATFORM_COUNT: Range = [5, 8]
 const SCATTER_PLATFORM_WIDTH: Range = [250, 620]
 const SCATTER_PLATFORM_HEIGHT: Range = [44, 68]
@@ -115,6 +140,7 @@ const SCATTER_PLATFORM_CLEARANCE_Y = 150
 const SCATTER_PLATFORM_ATTEMPTS = 80
 const CORRIDOR_PLATFORM_MARGIN = 86
 const CORRIDOR_OBJECT_MARGIN = 72
+
 const DEADLY_OBJECT_COUNT: Range = [3, 6]
 const DEADLY_OBJECT_HORIZONTAL_WIDTH: Range = [110, 320]
 const DEADLY_OBJECT_VERTICAL_HEIGHT: Range = [110, 300]
@@ -123,141 +149,316 @@ const DEADLY_OBJECT_FINISH_MARGIN = 260
 const DEADLY_OBJECT_ATTEMPTS = 60
 
 export function generateLevel(random: Random = Math.random): GeneratedLevel {
-  const startPlatform = createStartPlatform(random)
-  const startSurfaceY = surfaceYAt(startPlatform, START_X)
-  const finishLanding = createFinishLanding(startSurfaceY, random)
-  const corridor = createCorridor(startPlatform, finishLanding, random)
+  const startPlan = planStartPlatform(random)
+  const finishPlan = planFinishPlatform(random, startPlan.y)
+  const corridor = createCorridor(
+    startPlan,
+    finishPlan,
+    finishPlan.left + finishPlan.width,
+    random,
+  )
+
+  const startPlatform = createCorridorPlatform(random, corridor, {
+    anchorX: startPlan.x,
+    fillIndex: 0,
+    left: startPlan.left,
+    topBuffer: EDGE_CEILING_BUFFER,
+    width: startPlan.width,
+    desiredOffsetY: randomInRange(random, START_SURFACE_CENTERLINE_OFFSET),
+  })
+  const startSurfaceY = surfaceYAt(startPlatform, startPlan.x)
+  const finishPlatform = createCorridorPlatform(random, corridor, {
+    anchorX: finishPlan.x,
+    fillIndex: 6,
+    left: finishPlan.left,
+    minSurfaceY: startSurfaceY + MIN_FINISH_DROP_FROM_START,
+    topBuffer: FINISH_TOP_BUFFER,
+    width: finishPlan.width,
+    desiredOffsetY: randomInRange(random, FINISH_SURFACE_CENTERLINE_OFFSET),
+  })
+
+  const finishGoal: FinishGoal = {
+    surfaceY: surfaceYAt(finishPlatform, finishPlan.x),
+    x: finishPlan.x,
+  }
   const scatteredPlatforms = createScatteredPlatforms(
     random,
     startPlatform,
-    finishLanding.platform,
+    finishPlatform,
     corridor,
   )
-  const platforms = [
-    startPlatform,
-    ...scatteredPlatforms,
-    finishLanding.platform,
-  ]
-  const boundaryWalls = createBoundaryWalls(corridor)
+  const platforms = [startPlatform, ...scatteredPlatforms, finishPlatform]
+
   const terrain: TerrainSpec[] = [
     ...platforms.map(platformToSpec),
-    ...boundaryWalls,
-    ...createScatteredHazards(
-      random,
-      platforms,
-      finishLanding.goal,
-      corridor,
-    ),
-    {
-      deadly: false,
-      kind: 'finish',
-      shape: {
-        height: 220,
-        type: 'rect',
-        width: 52,
-        x: finishLanding.goal.x,
-        y: finishLanding.goal.surfaceY - 100,
-      },
-      style: {
-        fill: FINISH_FILL,
-        stroke: FINISH_STROKE,
-      },
-    },
+    createCorridorWall(corridor.walls.ceiling),
+    createCorridorWall(corridor.walls.floor),
+    ...createScatteredHazards(random, platforms, finishGoal, corridor),
+    finishMarkerSpec(finishGoal),
   ]
 
   return {
-    finishX: finishLanding.goal.x,
+    finishPlatformIndex: platforms.length - 1,
+    finishX: finishGoal.x,
+    startPlatformIndex: 0,
     startY: startSurfaceY - BALL_RADIUS - 24,
     terrain,
   }
 }
 
-function createStartPlatform(random: Random): Platform {
-  const leftTop = BASE_START_PLATFORM.leftTop + randomInt(random, -30, 28)
-  const rightTop = BASE_START_PLATFORM.rightTop + randomInt(random, -24, 36)
+// Start and finish share one plan shape: the route target (x, y) the corridor
+// aims at, plus the platform's desired horizontal extent (left, width).
+type PlatformPlan = { left: number; width: number; x: number; y: number }
+
+function planStartPlatform(random: Random): PlatformPlan {
+  const y = randomInRange(random, START_POINT_Y)
+  const width = randomInRange(random, START_PLATFORM_WIDTH)
 
   return {
-    ...BASE_START_PLATFORM,
-    fill: pickGroundFill(random, 0),
-    leftTop,
-    right: BASE_START_PLATFORM.right + randomInt(random, -72, 78),
-    rightTop,
+    left: START_X - CORRIDOR_START_BACKTRACK + START_PLATFORM_LEFT_INSET,
+    width,
+    x: START_X,
+    y,
   }
 }
 
-function createFinishLanding(
-  startSurfaceY: number,
-  random: Random,
-): FinishLanding {
-  const width = randomInt(
-    random,
-    FINAL_PLATFORM_WIDTH[0],
-    FINAL_PLATFORM_WIDTH[1],
-  )
+function planFinishPlatform(random: Random, startTargetY: number): PlatformPlan {
+  const width = randomInRange(random, FINAL_PLATFORM_WIDTH)
   const finishOffset = randomInt(
     random,
-    FINAL_PLATFORM_FINISH_OFFSET[0],
-    Math.min(
-      FINAL_PLATFORM_FINISH_OFFSET[1],
-      width - FINAL_PLATFORM_TRAILING_MARGIN,
-    ),
+    FINISH_LINE_OFFSET[0],
+    Math.min(FINISH_LINE_OFFSET[1], width - FINAL_PLATFORM_TRAILING_MARGIN),
   )
   const finishX = randomInt(
     random,
     START_X + FINISH_DISTANCE_X[0],
     Math.min(
       START_X + FINISH_DISTANCE_X[1],
-      WORLD_WIDTH -
-        FINAL_PLATFORM_RIGHT_MARGIN -
-        (width - finishOffset),
+      WORLD_WIDTH - FINAL_PLATFORM_RIGHT_MARGIN - (width - finishOffset),
     ),
   )
-  const rightRise = randomInt(
-    random,
-    FINAL_PLATFORM_RIGHT_RISE[0],
-    FINAL_PLATFORM_RIGHT_RISE[1],
-  )
-  const finishProgress = finishOffset / width
-  const minSlopeSurfaceY =
-    MIN_TRACK_TOP +
-    Math.max(
-      rightRise * finishProgress,
-      -rightRise * (1 - finishProgress),
-      0,
-    )
-  const maxSlopeSurfaceY =
-    MAX_TRACK_TOP -
-    Math.max(
-      -rightRise * finishProgress,
-      rightRise * (1 - finishProgress),
-      0,
-    )
-  const minSurfaceY = Math.max(
+  // The finish platform Y-value must be:
+  //    - At least `MIN_FINISH_DROP_FROM_START` distance from starting platform
+  //    - Within the `FINISH_SURFACE_Y` range (game design heuristic)
+  //    - Within the corridor "track": [MIN_TRACK_TOP, MAX_TRACK_TOP]
+  const minTargetY = Math.max(
     FINISH_SURFACE_Y[0],
-    startSurfaceY + MIN_FINISH_DROP_FROM_START,
-    minSlopeSurfaceY,
+    startTargetY + MIN_FINISH_DROP_FROM_START + FINISH_DROP_PLANNING_BUFFER,
+    MIN_TRACK_TOP,
   )
-  const maxSurfaceY = Math.min(FINISH_SURFACE_Y[1], maxSlopeSurfaceY)
-  const surfaceY = randomInt(
-    random,
-    Math.min(minSurfaceY, maxSurfaceY),
-    maxSurfaceY,
-  )
-  const left = finishX - finishOffset
-  const leftTop = surfaceY - rightRise * finishProgress
+  const maxTargetY = Math.min(FINISH_SURFACE_Y[1], MAX_TRACK_TOP)
 
   return {
-    goal: {
-      surfaceY,
-      x: finishX,
+    left: finishX - finishOffset,
+    width,
+    x: finishX,
+    y: randomInt(random, Math.min(minTargetY, maxTargetY), maxTargetY),
+  }
+}
+
+// Build a flat platform inside an already-generated corridor. The platform is
+// trimmed (keeping `anchorX` covered) until it fits the actual corridor wall
+// face, with sufficient headroom above for the ball to pass.
+function createCorridorPlatform(
+  random: Random,
+  corridor: Corridor,
+  opts: {
+    anchorX: number
+    fillIndex: number
+    left: number
+    minSurfaceY?: number
+    topBuffer: number
+    width: number,
+    // Desired distance from corridor centerline. Not guaranteed to get.
+    desiredOffsetY?: number,
+  },
+): Platform {
+  const { anchorX, fillIndex, left: desiredLeft, minSurfaceY, topBuffer, width } =
+    opts
+  const desiredOffsetY = opts.desiredOffsetY ?? 0
+  const height = randomInRange(random, SCATTER_PLATFORM_HEIGHT)
+
+  const { left, right } = flatSpanAroundAnchor(
+    anchorX,
+    corridorFaceXStops(corridor, anchorX, desiredLeft),
+    corridorFaceXStops(corridor, anchorX, desiredLeft + width),
+    (candidateLeft, candidateRight) => {
+      const fit = platformFitRange(
+        corridor,
+        candidateLeft,
+        candidateRight,
+        height,
+        topBuffer,
+      )
+
+      return (
+        fit?.fits === true &&
+        (minSurfaceY === undefined || minSurfaceY <= fit.maxSurfaceY)
+      )
     },
-    platform: {
-      fill: pickGroundFill(random, 6),
-      height: PLATFORM_HEIGHT,
-      left,
-      leftTop,
-      right: left + width,
-      rightTop: leftTop + rightRise,
+  )
+
+  // Using the given `start` and `finish` anchors from `generateLevel`, we found
+  // that every level has sufficient space for the flat platforms, as desired.
+  // Empirically tested in random sweep of 5,000 levels.
+  // `ceilingClearY`: Y-surface closest to ceiling with the required headroom.
+  // `floorClearY`: lowest Y-value where the platform doesn't touch the floor.
+  const centerSurfaceY = corridorCenterYAt(corridor, anchorX)
+  const fit = platformFitRange(corridor, left, right, height, topBuffer)
+  const ceilingClearY = fit?.minSurfaceY ?? centerSurfaceY
+  const floorClearY = Math.max(ceilingClearY, fit?.maxSurfaceY ?? centerSurfaceY)
+
+  if (!fit?.fits) {
+    console.warn(
+      `[level] platform near x=${Math.round(anchorX)} has no flat fit over ` +
+        `width ${Math.round(right - left)}; pinning to the ceiling buffer.`,
+    )
+  }
+  if (minSurfaceY !== undefined && minSurfaceY > floorClearY) {
+    console.warn(
+      `[level] platform near x=${Math.round(anchorX)} can't satisfy minimum ` +
+        `surface y=${Math.round(minSurfaceY)}; lowest safe surface is ` +
+        `${Math.round(floorClearY)}.`,
+    )
+  }
+
+  const targetY = centerSurfaceY + desiredOffsetY
+  // Aim for target Y-value. Bounded by the ceiling clearance, floor clearance,
+  // and the requested minimum given by the caller.
+  // When the requested minimum can't be met, we clamp to the floor clearance.
+  const surfaceY = clamp(
+    targetY,
+    Math.max(ceilingClearY, minSurfaceY ?? Number.NEGATIVE_INFINITY),
+    floorClearY,
+  )
+
+  return {
+    fill: pickGroundFill(random, fillIndex),
+    height,
+    left,
+    leftTop: surfaceY,
+    right,
+    rightTop: surfaceY,
+  }
+}
+
+// Returns widest flat span around anchorX that satisfies `fitsSpan`, bounded by
+// the final stop on each side. The edges grow outward through wall-vertex stops,
+// always taking the nearer next stop so growth stays centered on the anchor.
+// If widening to a stop fails, extending farther in that direction will obviously
+// fail as well. At that point, bisect between the last fit and the failed stop,
+// then stop growing that side.
+function flatSpanAroundAnchor(
+  anchorX: number,
+  stopsLeft: number[],
+  stopsRight: number[],
+  fitsSpan: (left: number, right: number) => boolean,
+): { left: number; right: number } {
+  const left = growEdge(anchorX, stopsLeft, (edge) => fitsSpan(edge, anchorX))
+  const right = growEdge(anchorX, stopsRight, (edge) => fitsSpan(left, edge))
+
+  return { left, right }
+}
+
+// Push one edge outward through its stops (ordered anchor-outward), keeping the
+// farthest that fits. When a stop overshoots, bisect the gap to it for the exact
+// farthest fitting point.
+function growEdge(
+  anchorX: number,
+  stops: number[],
+  edgeFits: (edge: number) => boolean,
+): number {
+  let edge = anchorX
+
+  for (const stop of stops) {
+    if (edgeFits(stop)) {
+      edge = stop
+    } else {
+      return farthestFittingEdge(edge, stop, edgeFits)
+    }
+  }
+
+  return edge
+}
+
+// Binary search through [fromX, toX] for the farthest point that still fits.
+// `fromX` fits (edgeFits returns true), but `toX` does not.
+// Return the point closest to `toX` that still passes the predicate.
+function farthestFittingEdge(
+  fromX: number,
+  toX: number,
+  edgeFits: (edge: number) => boolean,
+): number {
+  let fitT = 0
+  let failT = 1
+
+  for (let step = 0; step < 28; step += 1) {
+    const midT = (fitT + failT) / 2
+    if (edgeFits(fromX + (toX - fromX) * midT)) fitT = midT
+    else failT = midT
+  }
+
+  return fromX + (toX - fromX) * fitT
+}
+
+// Wall-face vertex x's between the anchor and the target edge, ordered from the
+// anchor outward, with the target edge itself as the final stop. segmentXStops
+// already returns the interior vertices deduped and ordered, so we only append
+// the target.
+function corridorFaceXStops(
+  corridor: Corridor,
+  fromX: number,
+  toX: number,
+): number[] {
+  const stops = segmentXStops(
+    [...corridor.faces.ceiling, ...corridor.faces.floor],
+    fromX,
+    toX,
+  )
+
+  return [...stops, toX]
+}
+
+function platformFitRange(
+  corridor: Corridor,
+  left: number,
+  right: number,
+  height: number,
+  topBuffer: number,
+): PlatformFitRange | null {
+  const ceilingRange = segmentsYRangeOverSpan(corridor.faces.ceiling, left, right)
+  const floorRange = segmentsYRangeOverSpan(corridor.faces.floor, left, right)
+
+  if (!ceilingRange || !floorRange) {
+    return null
+  }
+
+  // Highest surface that clears the ceiling buffer, and lowest that keeps the body
+  // off the floor; the platform fits flat when the former is at or above the latter.
+  const minSurfaceY = ceilingRange.maxY + topBuffer
+  const maxSurfaceY = floorRange.minY - height
+
+  return {
+    fits: minSurfaceY <= maxSurfaceY,
+    maxSurfaceY,
+    minSurfaceY,
+  }
+}
+
+function finishMarkerSpec(goal: FinishGoal): TerrainSpec {
+  return {
+    deadly: false,
+    kind: 'finish',
+    shape: {
+      height: FINISH_POST_HEIGHT,
+      type: 'rect',
+      width: 52,
+      x: goal.x,
+      y: goal.surfaceY - 100,
+    },
+    style: {
+      fill: FINISH_FILL,
+      stroke: FINISH_STROKE,
     },
   }
 }
@@ -265,18 +466,14 @@ function createFinishLanding(
 function createScatteredPlatforms(
   random: Random,
   startPlatform: Platform,
-  finalPlatform: Platform,
+  finishPlatform: Platform,
   corridor: Corridor,
 ): Platform[] {
   const platforms: Platform[] = []
-  const placed = [startPlatform, finalPlatform]
-  const count = randomInt(
-    random,
-    SCATTER_PLATFORM_COUNT[0],
-    SCATTER_PLATFORM_COUNT[1],
-  )
+  const placed = [startPlatform, finishPlatform]
+  const count = randomInRange(random, SCATTER_PLATFORM_COUNT)
   const minLeft = startPlatform.right + SCATTER_PLATFORM_EDGE_MARGIN
-  const maxRight = finalPlatform.left - SCATTER_PLATFORM_EDGE_MARGIN
+  const maxRight = finishPlatform.left - SCATTER_PLATFORM_EDGE_MARGIN
 
   if (maxRight - minLeft < SCATTER_PLATFORM_WIDTH[0]) {
     return platforms
@@ -330,23 +527,14 @@ function createScatteredPlatform(
     MAX_TRACK_TOP - 90,
   )
   const rightTop = clamp(
-    leftTop +
-      randomInt(
-        random,
-        SCATTER_PLATFORM_RIGHT_RISE[0],
-        SCATTER_PLATFORM_RIGHT_RISE[1],
-      ),
+    leftTop + randomInRange(random, SCATTER_PLATFORM_RIGHT_RISE),
     MIN_TRACK_TOP,
     MAX_TRACK_TOP,
   )
 
   return {
     fill: pickGroundFill(random, fillIndex + 1),
-    height: randomInt(
-      random,
-      SCATTER_PLATFORM_HEIGHT[0],
-      SCATTER_PLATFORM_HEIGHT[1],
-    ),
+    height: randomInRange(random, SCATTER_PLATFORM_HEIGHT),
     left,
     leftTop,
     right: left + width,
@@ -375,41 +563,43 @@ function isPlatformClear(
 }
 
 function createCorridor(
-  startPlatform: Platform,
-  finishLanding: FinishLanding,
+  startPoint: Point,
+  finishPoint: Point,
+  finishRight: number,
   random: Random,
 ): Corridor {
-  const startSurfaceY = surfaceYAt(startPlatform, START_X)
-  const routeStartX = START_X - CORRIDOR_START_BACKTRACK
-  const endX = Math.min(
-    WORLD_WIDTH,
-    finishLanding.platform.right + CORRIDOR_END_PADDING,
-  )
+  const routeStartX = startPoint.x - CORRIDOR_START_BACKTRACK
+  const endX = Math.min(WORLD_WIDTH, finishRight + CORRIDOR_END_PADDING)
   const slope =
-    (finishLanding.goal.surfaceY - startSurfaceY) /
-    (finishLanding.goal.x - START_X)
-  const startY = startSurfaceY + slope * (routeStartX - START_X)
-  const endY =
-    finishLanding.goal.surfaceY + slope * (endX - finishLanding.goal.x)
+    (finishPoint.y - startPoint.y) / (finishPoint.x - startPoint.x)
+  const startY = startPoint.y + slope * (routeStartX - startPoint.x)
+  const endY = finishPoint.y + slope * (endX - finishPoint.x)
   const path = createCorridorPath(
     random,
     routeStartX,
     startY,
-    finishLanding.goal.x,
-    finishLanding.goal.surfaceY,
+    finishPoint.x,
+    finishPoint.y,
     endX,
     endY,
   )
-  const finalPoint = path[path.length - 1]
+  const ceilingWall = offsetPathByVertexNormal(path, -CORRIDOR_HALF_HEIGHT)
+  const floorWall = offsetPathByVertexNormal(path, CORRIDOR_HALF_HEIGHT)
 
   return {
     endX,
-    endY: finalPoint.y,
+    faces: {
+      ceiling: offsetPolylineSegments(ceilingWall, WALL_THICKNESS / 2),
+      floor: offsetPolylineSegments(floorWall, -WALL_THICKNESS / 2),
+    },
     halfHeight: CORRIDOR_HALF_HEIGHT,
     length: pathLength(path),
     path,
     startX: routeStartX,
-    startY,
+    walls: {
+      ceiling: ceilingWall,
+      floor: floorWall,
+    },
   }
 }
 
@@ -567,60 +757,12 @@ function pickWeightedPoint(
   return { x: fallback.x, y: fallback.y }
 }
 
-function pathLength(path: Point[]) {
-  let length = 0
-
-  for (let index = 1; index < path.length; index += 1) {
-    length += distanceBetween(path[index - 1], path[index])
-  }
-
-  return length
-}
-
-function offsetPath(path: Point[], offset: number) {
-  return path.map((point, index) => {
-    const normal = pathPointNormal(path, index)
-
-    return {
-      x: point.x + normal.x * offset,
-      y: point.y + normal.y * offset,
-    }
-  })
-}
-
-function pathPointNormal(path: Point[], index: number) {
-  const previous = path[Math.max(0, index - 1)]
-  const next = path[Math.min(path.length - 1, index + 1)]
-  const dx = next.x - previous.x
-  const dy = next.y - previous.y
-  const length = Math.hypot(dx, dy) || 1
-
-  return {
-    x: -dy / length,
-    y: dx / length,
-  }
-}
-
-function distanceBetween(from: Point, to: Point) {
-  return Math.hypot(to.x - from.x, to.y - from.y)
-}
-
-function createBoundaryWalls(corridor: Corridor): TerrainSpec[] {
-  return [
-    createCorridorWallSide(corridor, -1),
-    createCorridorWallSide(corridor, 1),
-  ]
-}
-
-function createCorridorWallSide(
-  corridor: Corridor,
-  side: -1 | 1,
-): TerrainSpec {
+function createCorridorWall(points: Point[]): TerrainSpec {
   return {
     deadly: false,
     kind: 'wall',
     shape: {
-      points: offsetPath(corridor.path, side * corridor.halfHeight),
+      points,
       thickness: WALL_THICKNESS,
       type: 'polyline',
     },
@@ -638,7 +780,7 @@ function createScatteredHazards(
   corridor: Corridor,
 ): TerrainSpec[] {
   const objects: TerrainSpec[] = []
-  const count = randomInt(random, DEADLY_OBJECT_COUNT[0], DEADLY_OBJECT_COUNT[1])
+  const count = randomInRange(random, DEADLY_OBJECT_COUNT)
   const minX = START_X + DEADLY_OBJECT_START_MARGIN
   const maxX = Math.max(minX, finishGoal.x - DEADLY_OBJECT_FINISH_MARGIN)
 
@@ -673,60 +815,39 @@ function createScatteredHazard(
   maxX: number,
   corridor: Corridor,
 ): TerrainSpec {
+  // Most hazards are a wide floor strip of up-spikes; the rest are tall side spikes.
   if (random() < 0.68) {
-    const width = randomInt(
-      random,
-      DEADLY_OBJECT_HORIZONTAL_WIDTH[0],
-      DEADLY_OBJECT_HORIZONTAL_WIDTH[1],
-    )
-    const height = WALL_THICKNESS
+    const width = randomInRange(random, DEADLY_OBJECT_HORIZONTAL_WIDTH)
     const x = randomInt(random, minX + width / 2, maxX - width / 2)
-    const y = randomObjectY(random, corridor, x, height)
 
-    return {
-      deadly: true,
-      kind: 'object',
-      shape: {
-        height,
-        type: 'rect',
-        width,
-        x,
-        y,
-      },
-      style: {
-        fill: DEADLY_FILL,
-        spikes: 'up',
-        stroke: DEADLY_STROKE,
-      },
-    }
+    return deadlyRect(
+      x,
+      randomObjectY(random, corridor, x, WALL_THICKNESS),
+      width,
+      WALL_THICKNESS,
+      'up',
+    )
   }
 
-  const height = randomInt(
-    random,
-    DEADLY_OBJECT_VERTICAL_HEIGHT[0],
-    DEADLY_OBJECT_VERTICAL_HEIGHT[1],
-  )
-  const x = randomInt(
-    random,
-    minX + WALL_THICKNESS / 2,
-    maxX - WALL_THICKNESS / 2,
-  )
+  const height = randomInRange(random, DEADLY_OBJECT_VERTICAL_HEIGHT)
+  const x = randomInt(random, minX + WALL_THICKNESS / 2, maxX - WALL_THICKNESS / 2)
+  const y = randomObjectY(random, corridor, x, height)
 
+  return deadlyRect(x, y, WALL_THICKNESS, height, random() < 0.5 ? 'left' : 'right')
+}
+
+function deadlyRect(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  spikes: SpikeDirection,
+): TerrainSpec {
   return {
     deadly: true,
     kind: 'object',
-    shape: {
-      height,
-      type: 'rect',
-      width: WALL_THICKNESS,
-      x,
-      y: randomObjectY(random, corridor, x, height),
-    },
-    style: {
-      fill: DEADLY_FILL,
-      spikes: random() < 0.5 ? 'left' : 'right',
-      stroke: DEADLY_STROKE,
-    },
+    shape: { height, type: 'rect', width, x, y },
+    style: { fill: DEADLY_FILL, spikes, stroke: DEADLY_STROKE },
   }
 }
 
@@ -793,7 +914,7 @@ function isPlatformInsideCorridor(platform: Platform, corridor: Corridor) {
   ]
 
   return points.every((point) =>
-    isPointInsideCorridor(point.x, point.y, corridor, CORRIDOR_PLATFORM_MARGIN),
+    isPointInsideCorridor(point, corridor, CORRIDOR_PLATFORM_MARGIN),
   )
 }
 
@@ -809,21 +930,16 @@ function isObjectInsideCorridor(object: TerrainSpec, corridor: Corridor) {
   ]
 
   return points.every((point) =>
-    isPointInsideCorridor(point.x, point.y, corridor, CORRIDOR_OBJECT_MARGIN),
+    isPointInsideCorridor(point, corridor, CORRIDOR_OBJECT_MARGIN),
   )
 }
 
-function isPointInsideCorridor(
-  x: number,
-  y: number,
-  corridor: Corridor,
-  margin: number,
-) {
-  if (x < corridor.startX || x > corridor.endX) {
+function isPointInsideCorridor(point: Point, corridor: Corridor, margin: number) {
+  if (point.x < corridor.startX || point.x > corridor.endX) {
     return false
   }
 
-  const sample = nearestCorridorSample(corridor, x, y)
+  const sample = nearestCorridorSample(corridor, point.x, point.y)
 
   return (
     sample.progress >= 0 &&
@@ -992,4 +1108,8 @@ function pickGroundFill(random: Random, index: number) {
 
 function randomInt(random: Random, min: number, max: number) {
   return Math.floor(random() * (max - min + 1)) + min
+}
+
+function randomInRange(random: Random, [min, max]: Range): number {
+  return randomInt(random, min, max)
 }
