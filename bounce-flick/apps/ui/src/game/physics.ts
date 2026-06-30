@@ -197,10 +197,8 @@ export function tickPhysics(runtime: Runtime, seconds: number) {
   return didChangePhase
 }
 
-// One fixed simulation step: limit checks and ink recharge, then integrate.
-// Returns true if the phase changed this step (crash/clear) so callers can
-// force a HUD publish. The render loop and headless tests both call this, so
-// they advance the world identically.
+// Runs one fixed simulation step: limit checks and ink recharge, then integrate.
+// Returns true if the phase changed this step (crash/clear).
 export function advanceFrame(runtime: Runtime, stepMs: number = FIXED_STEP): boolean {
   const phaseChanged = tickPhysics(runtime, stepMs / 1000)
   stepEngine(runtime, stepMs)

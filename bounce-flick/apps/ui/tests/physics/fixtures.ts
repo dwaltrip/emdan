@@ -1,10 +1,10 @@
+// Hand-authored levels for the physics scenarios.
+
 import type { GeneratedLevel, TerrainSpec } from '../../src/game/types'
 
-// Hand-authored levels for the physics scenarios. style (fill/stroke/spikes)
-// is render-only and irrelevant to the simulation, so these builders default it
-// and expose only the physics-relevant shape. Rect coords are body centers,
-// matching how terrain.ts builds Matter bodies.
-const STYLE = { fill: '#000', stroke: '#000' }
+
+// Render-only style fields (fill/stroke/spikes) are not used, but must be set.
+const STYLE = { fill: 'rgb(0, 0, 0)', stroke: '#000' }
 
 function floor(
   x: number,
@@ -48,18 +48,37 @@ function finish(x: number, y: number, width: number, height: number): TerrainSpe
   }
 }
 
-// Scenario 1: a gentle downhill the ball rolls down into a tall finish band
-// sitting right next to the spawn. Expected outcome: cleared.
+// Scenario 1: The ball spawns on a gentle downhill slope right before the finish.
+// Expected: rolls down into the finish band -> "cleared"
 export const slopeToFinish: GeneratedLevel = {
   finishX: 600,
   startY: 560,
   terrain: [floor(500, 660, 1100, 60, 0.1), finish(600, 520, 40, 360)],
 }
 
-// Scenario 2: a narrow chute funnels the spawn straight down onto spikes.
-// Expected outcome: crashed.
+// Scenario 2: The ball spawns directly above spikes with walls on both sides.
+// Expected: falls downward landing on spikes -> "crashed"
 export const chuteWithSpikes: GeneratedLevel = {
   finishX: 4000,
   startY: 360,
   terrain: [wall(95, 460, 30, 320), wall(185, 460, 30, 320), spikes(140, 600, 160, 60)],
 }
+
+// Scenario 3: A spike pit between two platforms
+// Player must draw an ink bridge to cross safely.
+// Layout: start platform -> gap with spikes -> landing -> finish.
+// Expected: (1) falls into pit without the bridge and (2) crosses with the bridge.
+export const inkBridgeGap: GeneratedLevel = {
+  finishX: 900,
+  startY: 560,
+  terrain: [
+    floor(120, 640, 320, 60),
+    spikes(460, 780, 360, 60),
+    floor(800, 640, 320, 60),
+    finish(900, 520, 40, 360),
+  ],
+}
+
+// Coordinates for an ink bridge that crosses the gap in Scenario 3.
+// Lines up smoothly with platform. The test doesn't assume the ball can climb a lip.
+export const inkBridgeSpan = { from: { x: 270, y: 616 }, to: { x: 650, y: 616 } }

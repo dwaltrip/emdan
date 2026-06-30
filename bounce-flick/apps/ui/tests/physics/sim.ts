@@ -3,7 +3,7 @@ import {
   bindCollisionHandlers,
   createRuntime,
 } from '../../src/game/physics'
-import type { GeneratedLevel, Phase } from '../../src/game/types'
+import type { GeneratedLevel, Phase, Runtime } from '../../src/game/types'
 
 export interface SimResult {
   phase: Phase
@@ -12,12 +12,22 @@ export interface SimResult {
   y: number
 }
 
-// Headless driver: builds the real runtime for a level and pumps fixed steps
-// (the same advanceFrame the render loop runs) until the phase leaves 'running'
-// or the step budget is exhausted. No canvas, no RAF, no wall clock.
-export function simulate(level: GeneratedLevel, maxSteps = 1200): SimResult {
+export interface SimOptions {
+  maxSteps?: number
+  // Runs after the runtime is built but before stepping begins.
+  // Used to set up the scenario, e.g. drawing an ink bridge.
+  onReady?: (runtime: Runtime) => void
+}
+
+// Headless driver for a scenario. Builds the real runtime and advances it one
+// fixed step at a time until the phase leaves 'running' or maxSteps is reached.
+// Physics, logic, and state only. No UI or rendering.
+// It simulates via `advanceFrame` to match how the core game loop works.
+export function simulate(level: GeneratedLevel, options: SimOptions = {}): SimResult {
+  const { maxSteps = 1200, onReady } = options
   const runtime = createRuntime(level)
   const unbind = bindCollisionHandlers(runtime, () => {})
+  onReady?.(runtime)
 
   let steps = 0
   for (; steps < maxSteps; steps += 1) {
