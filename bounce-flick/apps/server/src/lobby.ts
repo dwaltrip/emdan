@@ -12,10 +12,12 @@ import {
 import type { ClientConnection } from './connection'
 import { Match } from './match'
 
-// Single-active-match lobby. It also owns the pre-game level handshake:
-// player 1 (first joiner) generates the level while player 2 is still arriving;
-// once both are seated and the level is in hand, the server hands it to player 2
-// and starts the match on their ack.
+// We are in prototype mode: server only runs a single match at a time.
+// GlobalLobby orchestrates this match.
+// Including pre-game level handshake:
+//    - Player 1 (first to join the lobby) generates the level and sends to server.
+//    - Once Player 2 (second to join) is connected, server sends them the level.
+//    - Player 2 sends a final ACK, and then "startMatch" runs.
 export class GlobalLobby {
   private readonly clients = new Map<string, ClientConnection>()
   private readonly waitingPlayers: ClientConnection[] = []
