@@ -180,9 +180,15 @@ function isGeneratedLevel(value: unknown): value is GeneratedLevel {
     isRecord(value) &&
     typeof value.finishX === 'number' &&
     typeof value.startY === 'number' &&
+    optionalNumber(value.finishPlatformIndex) &&
+    optionalNumber(value.startPlatformIndex) &&
     Array.isArray(value.terrain) &&
     value.terrain.every(isTerrainSpec)
   )
+}
+
+function optionalNumber(value: unknown) {
+  return value === undefined || typeof value === 'number'
 }
 
 function isTerrainSpec(value: unknown): value is TerrainSpec {
