@@ -221,6 +221,8 @@ export class GlobalLobby {
   // A disconnect during setup aborts the whole pending lobby: drop everyone
   // and notify any partner, who must re-join. Keeps generated levels and seat
   // ordering from drifting apart while players are still assembling.
+  // TODO(dan): Is this how we want it to work? This code will probably get replaced
+  // when we have real lobbies and whatnot, so not worth too much effort right now.
   private removeWaitingClient(clientId: string): void {
     const index = this.waitingPlayers.findIndex((player) => player.id === clientId)
     if (index === -1) {

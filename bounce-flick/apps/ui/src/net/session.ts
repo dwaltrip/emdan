@@ -45,13 +45,13 @@ export interface SessionDeps {
 }
 
 export interface Session {
+  live: LiveState
+
   getState: () => SessionState
   subscribe: (listener: () => void) => () => void
   joinLobby: () => void
   startNow: () => void
   end: () => void
-  // realtime hot path (non-reactive)
-  live: LiveState
   sendBall: (x: number, y: number) => void
   reportFinish: (elapsedMs: number) => void
 }
@@ -107,7 +107,7 @@ export function createSession(url: string, deps: SessionDeps): Session {
         setState({ started: true })
         return
       case 'state-update': {
-        // Hot path: bare assignment, no setState — never re-renders React.
+        // Multiplayer game updates. Rendered to game canvas, no React.
         live.ghostBalls = Object.entries(message.positions).flatMap(([seat, position]) => {
           if (seat === state.seat || position === null) {
             return []

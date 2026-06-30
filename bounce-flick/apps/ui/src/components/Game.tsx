@@ -27,8 +27,9 @@ function GameRun({
   const actionsRef = useRef<GameActions | null>(null)
   const [hud, setHud] = useState(INITIAL_HUD)
 
-  // Stable per mount so it doesn't retrigger the game-loop effect. Ghost ball
-  // reads are bare getters — the hot path never goes through React.
+  // Stable per mount so it doesn't retrigger the game-loop effect.
+  // `session.live` is non-React game state, safe to read in the callback.
+  // TODO(dan): Find a better API for giving live multiplayer state to game loop.
   const net = useMemo(
     () => ({
       sendBall: session.sendBall,
