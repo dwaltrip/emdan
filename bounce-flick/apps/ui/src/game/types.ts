@@ -60,7 +60,7 @@ export type Runtime = {
   inkSegments: InkSegment[]
   lastHudAt: number
   lastPointer: Point | null
-  opponent: Point | null
+  ghostBalls: Point[]
   pointerScreen: Point | null
   phase: Phase
   pointerId: number | null

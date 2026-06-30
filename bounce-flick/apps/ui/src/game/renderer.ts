@@ -38,13 +38,6 @@ export function renderScene(
 ) {
   updateCamera(runtime)
   context.clearRect(0, 0, runtime.viewportWidth, runtime.viewportHeight)
-  drawBackdrop(
-    context,
-    runtime.cameraX,
-    runtime.cameraY,
-    runtime.viewportWidth,
-    runtime.viewportHeight,
-  )
 
   context.save()
   context.translate(-runtime.cameraX, -runtime.cameraY)
@@ -93,9 +86,9 @@ export function renderScene(
 
   drawBall(context, runtime.ball)
 
-  if (runtime.opponent) {
-    drawGhostBall(context, runtime.opponent.x, runtime.opponent.y)
-  }
+  runtime.ghostBalls.forEach((ghostBall) => {
+    drawGhostBall(context, ghostBall.x, ghostBall.y)
+  })
 
   context.restore()
 
@@ -378,58 +371,5 @@ function drawGhostBall(
   context.lineWidth = 3
   context.strokeStyle = 'rgba(31, 44, 47, 0.55)'
   context.stroke()
-  context.restore()
-}
-
-function drawBackdrop(
-  context: CanvasRenderingContext2D,
-  cameraX: number,
-  cameraY: number,
-  width: number,
-  height: number,
-) {
-  const sky = context.createLinearGradient(0, 0, 0, height)
-  sky.addColorStop(0, '#cfeefa')
-  sky.addColorStop(0.58, '#eff8ec')
-  sky.addColorStop(1, '#f7f8fb')
-  context.fillStyle = sky
-  context.fillRect(0, 0, width, height)
-
-  context.save()
-  context.translate(0, -cameraY * 0.08)
-
-  context.fillStyle = 'rgba(255, 199, 94, 0.9)'
-  context.beginPath()
-  context.arc(width - 120, 92, 42, 0, Math.PI * 2)
-  context.fill()
-
-  const hillLayers = [
-    { color: '#94d2bd', height: 140, offset: 0.12 },
-    { color: '#5aa88e', height: 104, offset: 0.22 },
-    { color: '#447a76', height: 74, offset: 0.34 },
-  ]
-
-  hillLayers.forEach((layer, layerIndex) => {
-    const parallaxX = -(cameraX * layer.offset) % 520
-    const baseY = height - 72 + layerIndex * 22
-    context.fillStyle = layer.color
-    context.beginPath()
-    context.moveTo(-80, height)
-
-    for (let x = parallaxX - 560; x < width + 620; x += 260) {
-      context.quadraticCurveTo(
-        x + 130,
-        baseY - layer.height,
-        x + 260,
-        baseY,
-      )
-    }
-
-    context.lineTo(width + 80, height)
-    context.closePath()
-    context.globalAlpha = 0.5 + layerIndex * 0.16
-    context.fill()
-    context.globalAlpha = 1
-  })
   context.restore()
 }

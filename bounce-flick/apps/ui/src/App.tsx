@@ -21,6 +21,7 @@ function App() {
       status={state.status}
       lobby={state.lobby}
       onJoin={session.joinLobby}
+      onStartNow={session.startNow}
     />
   )
 }

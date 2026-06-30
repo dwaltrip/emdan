@@ -2,7 +2,7 @@ import type { GeneratedLevel, TerrainShape, TerrainSpec } from './level'
 
 export type { GeneratedLevel } from './level'
 
-export type PlayerSeat = 'player1' | 'player2'
+export type PlayerSeat = `player${number}`
 export type MatchEndReason = 'finished' | 'disconnect'
 export type MatchWinner = PlayerSeat | 'draw'
 
@@ -11,11 +11,13 @@ export interface BallPosition {
   y: number
 }
 
-export const REQUIRED_PLAYERS = 2
+export const MIN_PLAYERS = 1
+export const MAX_PLAYERS = 8
 
 // client -> server
 export type ClientMessage =
   | { type: 'join-lobby' }
+  | { type: 'start-now' }
   | { type: 'level-ready'; level: GeneratedLevel }
   | { type: 'game-level-received' }
   | { type: 'ball-update'; x: number; y: number }
@@ -54,6 +56,8 @@ export function parseClientMessage(raw: string): ClientMessage | null {
   switch (parsed.type) {
     case 'join-lobby':
       return { type: 'join-lobby' }
+    case 'start-now':
+      return { type: 'start-now' }
     case 'level-ready':
       return isGeneratedLevel(parsed.level) ? { type: 'level-ready', level: parsed.level } : null
     case 'game-level-received':
@@ -141,7 +145,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isSeat(value: unknown): value is PlayerSeat {
-  return value === 'player1' || value === 'player2'
+  return typeof value === 'string' && /^player[1-9]\d*$/.test(value)
 }
 
 function isBallPosition(value: unknown): value is BallPosition {
@@ -149,11 +153,9 @@ function isBallPosition(value: unknown): value is BallPosition {
 }
 
 function isPositions(value: unknown): value is Record<PlayerSeat, BallPosition | null> {
-  return (
-    isRecord(value) &&
-    (value.player1 === null || isBallPosition(value.player1)) &&
-    (value.player2 === null || isBallPosition(value.player2))
-  )
+  return isRecord(value) && Object.entries(value).every(([seat, position]) => {
+    return isSeat(seat) && (position === null || isBallPosition(position))
+  })
 }
 
 function isMatchEndReason(value: unknown): value is MatchEndReason {
@@ -165,11 +167,9 @@ function isMatchWinnerOrNull(value: unknown): value is MatchWinner | null {
 }
 
 function isTimes(value: unknown): value is Record<PlayerSeat, number | null> {
-  return (
-    isRecord(value) &&
-    (value.player1 === null || typeof value.player1 === 'number') &&
-    (value.player2 === null || typeof value.player2 === 'number')
-  )
+  return isRecord(value) && Object.entries(value).every(([seat, time]) => {
+    return isSeat(seat) && (time === null || typeof time === 'number')
+  })
 }
 
 // Shallow validation: the level round-trips through JSON between our own

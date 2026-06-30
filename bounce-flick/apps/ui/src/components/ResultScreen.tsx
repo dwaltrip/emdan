@@ -6,16 +6,20 @@ type ResultScreenProps = {
 }
 
 export function ResultScreen({ result, onPlayAgain }: ResultScreenProps) {
-  const otherSeat = result.seat === 'player1' ? 'player2' : 'player1'
   const myTime = result.seat ? result.times[result.seat] : null
-  const theirTime = result.times[otherSeat]
+  const opponentTimes = Object.entries(result.times)
+    .filter(([seat]) => seat !== result.seat)
+    .map(([, time]) => time)
 
   return (
     <main className="join-screen">
       <h1>{outcomeText(result)}</h1>
       {result.reason === 'finished' && (
         <p>
-          You: {formatTime(myTime)} · Opponent: {formatTime(theirTime)}
+          You: {formatTime(myTime)}
+          {opponentTimes.length > 0 && (
+            <> · Others: {opponentTimes.map(formatTime).join(', ')}</>
+          )}
         </p>
       )}
       <button type="button" onClick={onPlayAgain}>

@@ -13,29 +13,30 @@ export class Match {
   private readonly clientIds: Record<PlayerSeat, string>
   private readonly send: MatchOptions['send']
   private readonly onEnded: MatchOptions['onEnded']
-  private readonly positions: Record<PlayerSeat, BallPosition | null> = {
-    player1: null,
-    player2: null,
-  }
-  private readonly finishTimes: Record<PlayerSeat, number | null> = {
-    player1: null,
-    player2: null,
-  }
+  private readonly seats: PlayerSeat[]
+  private readonly positions: Record<PlayerSeat, BallPosition | null> = {}
+  private readonly finishTimes: Record<PlayerSeat, number | null> = {}
   private ended = false
 
   constructor(options: MatchOptions) {
     this.clientIds = options.clientIds
     this.send = options.send
     this.onEnded = options.onEnded
+    this.seats = Object.keys(options.clientIds) as PlayerSeat[]
+    this.seats.forEach((seat) => {
+      this.positions[seat] = null
+      this.finishTimes[seat] = null
+    })
   }
 
   start(): void {
-    this.send('player1', { type: 'start-game' })
-    this.send('player2', { type: 'start-game' })
+    this.seats.forEach((seat) => {
+      this.send(seat, { type: 'start-game' })
+    })
   }
 
   hasClient(clientId: string): boolean {
-    return this.clientIds.player1 === clientId || this.clientIds.player2 === clientId
+    return Object.values(this.clientIds).includes(clientId)
   }
 
   handleBallUpdate(clientId: string, x: number, y: number): void {
@@ -64,8 +65,8 @@ export class Match {
 
     this.finishTimes[seat] = elapsedMs
 
-    // Wait for both to finish, then compare times.
-    if (this.finishTimes.player1 !== null && this.finishTimes.player2 !== null) {
+    // Wait for every participant to finish, then compare times.
+    if (this.seats.every((playerSeat) => typeof this.finishTimes[playerSeat] === 'number')) {
       this.finish('finished', this.decideWinner())
     }
   }
@@ -90,33 +91,56 @@ export class Match {
       winner,
       times: this.finishTimes,
     }
-    this.send('player1', message)
-    this.send('player2', message)
+    this.seats.forEach((seat) => {
+      this.send(seat, message)
+    })
     this.onEnded()
   }
 
   private decideWinner(): MatchWinner {
-    const p1 = this.finishTimes.player1
-    const p2 = this.finishTimes.player2
-    if (p1 === null || p2 === null || p1 === p2) {
+    let winningSeat: PlayerSeat | null = null
+    let winningTime = Number.POSITIVE_INFINITY
+    let tied = false
+
+    this.seats.forEach((seat) => {
+      const time = this.finishTimes[seat]
+      if (time === null || time === undefined) {
+        return
+      }
+
+      if (time < winningTime) {
+        winningSeat = seat
+        winningTime = time
+        tied = false
+        return
+      }
+
+      if (time === winningTime) {
+        tied = true
+      }
+    })
+
+    if (!winningSeat || tied) {
       return 'draw'
     }
-    return p1 < p2 ? 'player1' : 'player2'
+
+    return winningSeat
   }
 
   private broadcast(): void {
     const message: ServerMessage = { type: 'state-update', positions: this.positions }
-    this.send('player1', message)
-    this.send('player2', message)
+    this.seats.forEach((seat) => {
+      this.send(seat, message)
+    })
   }
 
   private seatOf(clientId: string): PlayerSeat | null {
-    if (this.clientIds.player1 === clientId) {
-      return 'player1'
+    for (const [seat, seatClientId] of Object.entries(this.clientIds)) {
+      if (seatClientId === clientId) {
+        return seat as PlayerSeat
+      }
     }
-    if (this.clientIds.player2 === clientId) {
-      return 'player2'
-    }
+
     return null
   }
 }

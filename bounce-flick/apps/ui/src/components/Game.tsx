@@ -27,12 +27,12 @@ function GameRun({
   const actionsRef = useRef<GameActions | null>(null)
   const [hud, setHud] = useState(INITIAL_HUD)
 
-  // Stable per mount so it doesn't retrigger the game-loop effect. The opponent
-  // read is a bare getter — the hot path never goes through React.
+  // Stable per mount so it doesn't retrigger the game-loop effect. Ghost ball
+  // reads are bare getters — the hot path never goes through React.
   const net = useMemo(
     () => ({
       sendBall: session.sendBall,
-      getOpponent: () => session.live.opponent,
+      getGhostBalls: () => session.live.ghostBalls,
       reportFinish: session.reportFinish,
     }),
     [],

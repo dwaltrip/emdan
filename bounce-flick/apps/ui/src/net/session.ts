@@ -37,7 +37,7 @@ export interface SessionState {
 // State that lives outside of the React render process.
 // Live multiplayer game state. Rendered by `game.renderer`.
 export interface LiveState {
-  opponent: BallPosition | null
+  ghostBalls: BallPosition[]
 }
 
 export interface SessionDeps {
@@ -48,6 +48,7 @@ export interface Session {
   getState: () => SessionState
   subscribe: (listener: () => void) => () => void
   joinLobby: () => void
+  startNow: () => void
   end: () => void
   // realtime hot path (non-reactive)
   live: LiveState
@@ -65,13 +66,7 @@ export function createSession(url: string, deps: SessionDeps): Session {
     result: null,
   }
   const listeners = new Set<() => void>()
-  const live: LiveState = { opponent: null }
-
-  function otherSeat(): PlayerSeat | null {
-    if (state.seat === 'player1') return 'player2'
-    if (state.seat === 'player2') return 'player1'
-    return null
-  }
+  const live: LiveState = { ghostBalls: [] }
 
   function setState(patch: Partial<SessionState>): void {
     state = { ...state, ...patch }
@@ -112,13 +107,18 @@ export function createSession(url: string, deps: SessionDeps): Session {
         setState({ started: true })
         return
       case 'state-update': {
-        // Multiplayer game updates. Rendered to game canvas, no React.
-        const other = otherSeat()
-        live.opponent = other ? message.positions[other] : null
+        // Hot path: bare assignment, no setState — never re-renders React.
+        live.ghostBalls = Object.entries(message.positions).flatMap(([seat, position]) => {
+          if (seat === state.seat || position === null) {
+            return []
+          }
+
+          return [position]
+        })
         return
       }
       case 'match-ended':
-        live.opponent = null
+        live.ghostBalls = []
         setState({
           result: {
             reason: message.reason,
@@ -156,6 +156,7 @@ export function createSession(url: string, deps: SessionDeps): Session {
       setState({ result: null })
       socket.send({ type: 'join-lobby' })
     },
+    startNow: () => socket.send({ type: 'start-now' }),
     end: () => socket.close(),
     live,
     sendBall: (x, y) => socket.send({ type: 'ball-update', x, y }),

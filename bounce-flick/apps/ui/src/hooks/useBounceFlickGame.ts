@@ -14,7 +14,7 @@ import type { GameActions, GeneratedLevel, HudSnapshot } from '../game/types'
 
 type NetBridge = {
   sendBall: (x: number, y: number) => void
-  getOpponent: () => { x: number; y: number } | null
+  getGhostBalls: () => Array<{ x: number; y: number }>
   reportFinish: (elapsedMs: number) => void
 }
 
@@ -82,7 +82,7 @@ export function useBounceFlickGame({
       }
 
       if (net) {
-        runtime.opponent = net.getOpponent()
+        runtime.ghostBalls = net.getGhostBalls()
         net.sendBall(runtime.ball.position.x, runtime.ball.position.y)
 
         if (runtime.phase === 'cleared' && !reportedFinish) {
