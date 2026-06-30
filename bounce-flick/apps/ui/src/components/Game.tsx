@@ -8,8 +8,8 @@ import { GameHeader } from './GameHeader'
 import { GameStage } from './GameStage'
 
 export function Game({ level }: { level: GeneratedLevel }) {
-  // Restart re-runs the same agreed level (not a fresh one) by remounting the
-  // run. Bumping the key tears down the old runtime and builds a new one.
+  // Restart re-runs the same level by remounting `GameRun` with key bump.
+  // Remounting tears down and rebuilds the runtime (see `useBounceFlickGame`).
   const [runKey, setRunKey] = useState(0)
   const restart = useCallback(() => setRunKey((key) => key + 1), [])
 

@@ -197,8 +197,7 @@ export function tickPhysics(runtime: Runtime, seconds: number) {
   return didChangePhase
 }
 
-// Runs one fixed simulation step: limit checks and ink recharge, then integrate.
-// Returns true if the phase changed this step (crash/clear).
+// Runs one simulation step. Returns true if `runtime.phase` changed.
 export function advanceFrame(runtime: Runtime, stepMs: number = FIXED_STEP): boolean {
   const phaseChanged = tickPhysics(runtime, stepMs / 1000)
   stepEngine(runtime, stepMs)

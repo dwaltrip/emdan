@@ -7,8 +7,7 @@ import type {
   TerrainStyle,
 } from '@shared/level'
 
-// Serializable level types now live in shared/ (they travel over the wire).
-// Re-exported here so existing `from './types'` imports keep working.
+// Re-export shared types for easier use in `apps/ui`
 export type {
   GeneratedLevel,
   Point,

@@ -6,9 +6,7 @@ const WS_URL =
   (import.meta.env.VITE_WS_URL as string | undefined) ??
   `ws://${window.location.hostname}:3002`
 
-// Module-level singleton: one socket that outlives any React mount. Nothing
-// imports this yet — the App wiring (join screen + starting the game with the
-// agreed level) is the next step.
+// Module-level singleton
 export const session = createSession(WS_URL, { generateLevel })
 
 if (import.meta.hot) {

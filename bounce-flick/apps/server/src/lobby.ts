@@ -75,7 +75,7 @@ export class GlobalLobby {
 
   private joinLobby(client: ClientConnection): void {
     if (this.activeMatch && !this.activeMatch.hasClient(client.id)) {
-      this.sendError(client, 'match-in-progress', 'A match is already running. Try again when it ends.')
+      this.sendError(client, 'match-in-progress', ' match already running. Try again later.')
       return
     }
 
