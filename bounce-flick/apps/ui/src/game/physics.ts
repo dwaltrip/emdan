@@ -3,6 +3,7 @@ import {
   BALL_RADIUS,
   DRIVE_ACCELERATION,
   DRIVE_SPEED,
+  FIXED_STEP,
   GRAVITY,
   INK_COST_PER_PIXEL,
   INK_RECHARGE_PER_SECOND,
@@ -194,6 +195,16 @@ export function tickPhysics(runtime: Runtime, seconds: number) {
   }
 
   return didChangePhase
+}
+
+// One fixed simulation step: limit checks and ink recharge, then integrate.
+// Returns true if the phase changed this step (crash/clear) so callers can
+// force a HUD publish. The render loop and headless tests both call this, so
+// they advance the world identically.
+export function advanceFrame(runtime: Runtime, stepMs: number = FIXED_STEP): boolean {
+  const phaseChanged = tickPhysics(runtime, stepMs / 1000)
+  stepEngine(runtime, stepMs)
+  return phaseChanged
 }
 
 export function clampDrawingPoint(point: Point): Point {

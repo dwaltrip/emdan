@@ -2,13 +2,12 @@ import { useEffect } from 'react'
 import { FIXED_STEP } from '../game/constants'
 import { bindKeyboardControls, bindPointerControls } from '../game/input'
 import {
+  advanceFrame,
   bindCollisionHandlers,
   clearDrawings,
   createHudSnapshot,
   createRuntime,
   destroyRuntime,
-  stepEngine,
-  tickPhysics,
 } from '../game/physics'
 import { renderScene, resizeCanvas } from '../game/renderer'
 import type { GameActions, GeneratedLevel, HudSnapshot } from '../game/types'
@@ -76,10 +75,9 @@ export function useBounceFlickGame({
       accumulator += delta
 
       while (accumulator >= FIXED_STEP) {
-        if (tickPhysics(runtime, FIXED_STEP / 1000)) {
+        if (advanceFrame(runtime, FIXED_STEP)) {
           publishHud(true)
         }
-        stepEngine(runtime, FIXED_STEP)
         accumulator -= FIXED_STEP
       }
 
