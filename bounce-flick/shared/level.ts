@@ -43,7 +43,9 @@ export type TerrainSpec = {
 }
 
 export type GeneratedLevel = {
+  finishPlatformIndex?: number
   finishX: number
+  startPlatformIndex?: number
   startY: number
   terrain: TerrainSpec[]
 }
