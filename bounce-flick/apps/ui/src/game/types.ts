@@ -47,6 +47,7 @@ export type TerrainPiece = {
 
 export type GameActions = {
   clearDrawings: () => void
+  eraseRecentInk: () => void
 }
 
 export type Runtime = {

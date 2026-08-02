@@ -6,9 +6,14 @@ import type { Point, Runtime } from './types'
 
 type PublishHud = (force?: boolean) => void
 
+type KeyboardActions = {
+  clearDrawings: () => void
+  eraseRecentInk: () => void
+}
+
 export function bindKeyboardControls(
   runtime: Runtime,
-  onClearDrawings: () => void,
+  actions: KeyboardActions,
 ) {
   const handleKeyDown = (event: KeyboardEvent) => {
     if (isEditableEventTarget(event.target)) {
@@ -29,7 +34,19 @@ export function bindKeyboardControls(
       !event.metaKey
     ) {
       event.preventDefault()
-      onClearDrawings()
+      actions.clearDrawings()
+      return
+    }
+
+    if (
+      event.code === 'KeyZ' &&
+      !event.repeat &&
+      !event.altKey &&
+      !event.ctrlKey &&
+      !event.metaKey
+    ) {
+      event.preventDefault()
+      actions.eraseRecentInk()
     }
   }
 
@@ -62,6 +79,19 @@ export function bindPointerControls(
   runtime: Runtime,
   publishHud: PublishHud,
 ) {
+  const cancelActiveStroke = () => {
+    if (
+      runtime.pointerId !== null &&
+      canvas.hasPointerCapture(runtime.pointerId)
+    ) {
+      canvas.releasePointerCapture(runtime.pointerId)
+    }
+
+    runtime.pointerId = null
+    runtime.lastPointer = null
+    runtime.pointerScreen = null
+  }
+
   const handlePointerDown = (event: PointerEvent) => {
     if (runtime.phase !== 'running' || event.button !== 0) {
       return
@@ -97,13 +127,7 @@ export function bindPointerControls(
       return
     }
 
-    if (canvas.hasPointerCapture(event.pointerId)) {
-      canvas.releasePointerCapture(event.pointerId)
-    }
-
-    runtime.pointerId = null
-    runtime.lastPointer = null
-    runtime.pointerScreen = null
+    cancelActiveStroke()
   }
 
   canvas.addEventListener('pointerdown', handlePointerDown)
@@ -111,11 +135,14 @@ export function bindPointerControls(
   canvas.addEventListener('pointerup', endPointer)
   canvas.addEventListener('pointercancel', endPointer)
 
-  return () => {
-    canvas.removeEventListener('pointerdown', handlePointerDown)
-    canvas.removeEventListener('pointermove', handlePointerMove)
-    canvas.removeEventListener('pointerup', endPointer)
-    canvas.removeEventListener('pointercancel', endPointer)
+  return {
+    cancelActiveStroke,
+    cleanup: () => {
+      canvas.removeEventListener('pointerdown', handlePointerDown)
+      canvas.removeEventListener('pointermove', handlePointerMove)
+      canvas.removeEventListener('pointerup', endPointer)
+      canvas.removeEventListener('pointercancel', endPointer)
+    },
   }
 }
 

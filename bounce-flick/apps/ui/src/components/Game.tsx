@@ -45,9 +45,18 @@ function GameRun({
     actionsRef.current?.clearDrawings()
   }, [])
 
+  const eraseRecentInk = useCallback(() => {
+    actionsRef.current?.eraseRecentInk()
+  }, [])
+
   return (
     <main className="game-shell">
-      <GameHeader hud={hud} onClearDrawings={clearDrawings} onRestart={onRestart} />
+      <GameHeader
+        hud={hud}
+        onClearDrawings={clearDrawings}
+        onEraseRecentInk={eraseRecentInk}
+        onRestart={onRestart}
+      />
       <GameStage canvasRef={canvasRef} hud={hud} />
     </main>
   )

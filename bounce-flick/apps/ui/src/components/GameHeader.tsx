@@ -4,12 +4,14 @@ import type { HudSnapshot } from '../game/types'
 type GameHeaderProps = {
   hud: HudSnapshot
   onClearDrawings: () => void
+  onEraseRecentInk: () => void
   onRestart: () => void
 }
 
 export function GameHeader({
   hud,
   onClearDrawings,
+  onEraseRecentInk,
   onRestart,
 }: GameHeaderProps) {
   return (
@@ -25,6 +27,9 @@ export function GameHeader({
       <HudPanel hud={hud} />
 
       <div className="game-actions">
+        <button type="button" onClick={onEraseRecentInk}>
+          Erase recent (Z)
+        </button>
         <button type="button" onClick={onClearDrawings}>
           Clear ink
         </button>

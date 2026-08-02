@@ -6,6 +6,7 @@ import {
   FIXED_STEP,
   GRAVITY,
   INK_COST_PER_PIXEL,
+  INK_ERASE_DISTANCE,
   INK_RECHARGE_PER_SECOND,
   INK_THICKNESS,
   MAX_INK,
@@ -211,6 +212,26 @@ export function clampDrawingPoint(point: Point): Point {
   }
 }
 
+function createInkBody(from: Point, to: Point) {
+  const length = distance(from, to)
+  const angle = Math.atan2(to.y - from.y, to.x - from.x)
+
+  return Matter.Bodies.rectangle(
+    (from.x + to.x) / 2,
+    (from.y + to.y) / 2,
+    length,
+    INK_THICKNESS,
+    {
+      angle,
+      chamfer: { radius: INK_THICKNESS / 2 },
+      friction: 0.96,
+      isStatic: true,
+      label: 'ink',
+      restitution: 0.05,
+    },
+  )
+}
+
 export function addInkSegment(runtime: Runtime, from: Point, target: Point) {
   const fullLength = distance(from, target)
   if (fullLength < MIN_SEGMENT_LENGTH || runtime.ink <= 0.4) {
@@ -230,23 +251,7 @@ export function addInkSegment(runtime: Runtime, from: Point, target: Point) {
     x: from.x + (target.x - from.x) * ratio,
     y: from.y + (target.y - from.y) * ratio,
   }
-  const angle = Math.atan2(to.y - from.y, to.x - from.x)
-  const midX = (from.x + to.x) / 2
-  const midY = (from.y + to.y) / 2
-  const body = Matter.Bodies.rectangle(
-    midX,
-    midY,
-    affordableLength,
-    INK_THICKNESS,
-    {
-      angle,
-      chamfer: { radius: INK_THICKNESS / 2 },
-      friction: 0.96,
-      isStatic: true,
-      label: 'ink',
-      restitution: 0.05,
-    },
-  )
+  const body = createInkBody(from, to)
   const segment: InkSegment = { body, from, to }
 
   Matter.Composite.add(runtime.engine.world, body)
@@ -254,6 +259,48 @@ export function addInkSegment(runtime: Runtime, from: Point, target: Point) {
   runtime.ink -= affordableLength * INK_COST_PER_PIXEL
 
   return to
+}
+
+export function eraseRecentInk(
+  runtime: Runtime,
+  distanceToErase: number = INK_ERASE_DISTANCE,
+) {
+  if (!Number.isFinite(distanceToErase) || distanceToErase <= 0) {
+    return 0
+  }
+
+  let erasedDistance = 0
+  let remainingDistance = distanceToErase
+
+  while (remainingDistance > 0 && runtime.inkSegments.length > 0) {
+    const index = runtime.inkSegments.length - 1
+    const segment = runtime.inkSegments[index]
+    const segmentLength = distance(segment.from, segment.to)
+    const preservedLength = segmentLength - remainingDistance
+
+    if (preservedLength < MIN_SEGMENT_LENGTH) {
+      Matter.Composite.remove(runtime.engine.world, segment.body)
+      runtime.inkSegments.pop()
+      erasedDistance += segmentLength
+      remainingDistance = Math.max(0, remainingDistance - segmentLength)
+      continue
+    }
+
+    const ratio = preservedLength / segmentLength
+    const to = {
+      x: segment.from.x + (segment.to.x - segment.from.x) * ratio,
+      y: segment.from.y + (segment.to.y - segment.from.y) * ratio,
+    }
+    const body = createInkBody(segment.from, to)
+
+    Matter.Composite.remove(runtime.engine.world, segment.body)
+    Matter.Composite.add(runtime.engine.world, body)
+    runtime.inkSegments[index] = { body, from: segment.from, to }
+    erasedDistance += remainingDistance
+    remainingDistance = 0
+  }
+
+  return erasedDistance
 }
 
 export function clearDrawings(runtime: Runtime) {

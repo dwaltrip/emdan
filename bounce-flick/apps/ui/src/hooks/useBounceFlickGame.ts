@@ -8,6 +8,7 @@ import {
   createHudSnapshot,
   createRuntime,
   destroyRuntime,
+  eraseRecentInk,
 } from '../game/physics'
 import { renderScene, resizeCanvas } from '../game/renderer'
 import type { GameActions, GeneratedLevel, HudSnapshot } from '../game/types'
@@ -97,10 +98,18 @@ export function useBounceFlickGame({
     }
 
     const resizeObserver = new ResizeObserver(resize)
-    const cleanupInput = bindPointerControls(canvas, runtime, publishHud)
-    const cleanupKeyboard = bindKeyboardControls(runtime, () => {
-      clearDrawings(runtime)
+    const pointerControls = bindPointerControls(canvas, runtime, publishHud)
+    const eraseRecent = () => {
+      pointerControls.cancelActiveStroke()
+      eraseRecentInk(runtime)
       publishHud(true)
+    }
+    const cleanupKeyboard = bindKeyboardControls(runtime, {
+      clearDrawings: () => {
+        clearDrawings(runtime)
+        publishHud(true)
+      },
+      eraseRecentInk: eraseRecent,
     })
     const cleanupCollisions = bindCollisionHandlers(runtime, () => {
       publishHud(true)
@@ -113,6 +122,7 @@ export function useBounceFlickGame({
         clearDrawings(runtime)
         publishHud(true)
       },
+      eraseRecentInk: eraseRecent,
     }
     publishHud(true)
     runtime.rafId = window.requestAnimationFrame(frame)
@@ -120,7 +130,7 @@ export function useBounceFlickGame({
     return () => {
       window.cancelAnimationFrame(runtime.rafId)
       resizeObserver.disconnect()
-      cleanupInput()
+      pointerControls.cleanup()
       cleanupKeyboard()
       cleanupCollisions()
       destroyRuntime(runtime)

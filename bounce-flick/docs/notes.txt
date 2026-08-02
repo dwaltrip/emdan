@@ -1,0 +1,14 @@
++ undo most recent sections of ink
+- sometimes viewport doesn't track ball when there is a sharp downward drop in the channel
+- level should auto restart instead of click button to restart
+- experiment with physics
+    - should ball bounce or slide on objects. maybe multiple kinds of surfaces
+    - should ball bounce or slide on ink
+- higher variance on map generation randomness. but must still be solvable.
+- there were some two-player bugs that i don't quite remember
+    - clock was wrong (didn't sum total tries)
+    - for emile, he kept seeing "opponent left" and we couldn't play together
+- establish human apis. unslop
+- move map generation into server
+- multiple parallel matches
+- auto format

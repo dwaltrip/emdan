@@ -196,7 +196,6 @@
   position: relative;
   min-height: 0;
   overflow: hidden;
-  background: #cfeefa;
 }
 
 .game-stage canvas {
