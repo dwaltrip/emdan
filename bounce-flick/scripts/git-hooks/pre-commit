@@ -1,0 +1,11 @@
+#!/bin/sh
+# Auto-format staged bounce-flick files (lint-staged + Biome).
+# Enable per clone with: git config core.hooksPath bounce-flick/scripts/git-hooks
+
+# Git GUIs run hooks without the shell profile; source fnm so node is available.
+if ! command -v node >/dev/null 2>&1 && command -v fnm >/dev/null 2>&1; then
+  eval "$(fnm env)"
+fi
+
+cd "$(git rev-parse --show-toplevel)/bounce-flick" || exit 1
+exec ./node_modules/.bin/lint-staged
