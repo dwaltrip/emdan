@@ -1,7 +1,6 @@
-// Plain, serializable level types. These travel over the wire (player 1
-// generates a level and the server relays it to player 2), so they live in
-// shared/ and are re-exported from the ui's game/types.ts. Matter-backed
-// runtime types (TerrainPiece, Runtime) stay in the ui.
+// Plain, serializable level types. The server generates a level and sends it
+// to every player, so these live in shared/ alongside the generator and wire
+// protocol. Matter-backed runtime types (TerrainPiece, Runtime) stay in the UI.
 
 export type Point = {
   x: number

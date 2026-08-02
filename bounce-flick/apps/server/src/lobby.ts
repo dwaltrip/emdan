@@ -11,14 +11,13 @@ import {
 } from '@shared/protocol'
 
 import type { ClientConnection } from './connection'
+import { generateLevel } from './generate-level'
 import { Match } from './match'
 
 // We are in prototype mode: server only runs a single match at a time.
 // GlobalLobby orchestrates this match.
-// Including pre-game level handshake:
-//    - Player 1 (first to join the lobby) generates the level and sends to server.
-//    - Once other players join, server sends them the agreed level.
-//    - Any waiting player can press "Start now" once the level is ready.
+// The server generates one level per lobby and sends it to every player.
+// Any waiting player can press "Start now" once the level is ready.
 export class GlobalLobby {
   private readonly clients = new Map<string, ClientConnection>()
   private readonly waitingPlayers: ClientConnection[] = []
@@ -58,12 +57,6 @@ export class GlobalLobby {
       case 'start-now':
         this.handleStartNow(client)
         return
-      case 'level-ready':
-        this.handleLevelReady(clientId, message.level)
-        return
-      case 'game-level-received':
-        this.handleGameLevelReceived(clientId)
-        return
       case 'ball-update':
         if (this.activeMatch?.hasClient(clientId)) {
           this.activeMatch.handleBallUpdate(clientId, message.x, message.y)
@@ -98,26 +91,10 @@ export class GlobalLobby {
 
     this.send(client, { type: 'welcome', seat })
 
-    if (seat === 'player1') {
-      this.send(client, { type: 'generate-level-request' })
+    if (!this.pendingLevel) {
+      this.pendingLevel = generateLevel()
     }
 
-    this.broadcastLobbyUpdate()
-
-    this.maybeSendGameLevel()
-  }
-
-  private handleLevelReady(clientId: string, level: GeneratedLevel): void {
-    if (this.activeMatch || this.pendingLevel) {
-      return
-    }
-
-    const generator = this.waitingPlayers[0]
-    if (!generator || generator.id !== clientId) {
-      return
-    }
-
-    this.pendingLevel = level
     this.maybeSendGameLevel()
     this.broadcastLobbyUpdate()
   }
@@ -128,7 +105,7 @@ export class GlobalLobby {
       return
     }
 
-    this.waitingPlayers.slice(1).forEach((player) => {
+    this.waitingPlayers.forEach((player) => {
       if (this.levelRecipients.has(player.id)) {
         return
       }
@@ -136,14 +113,6 @@ export class GlobalLobby {
       this.send(player, { type: 'game-level', level })
       this.levelRecipients.add(player.id)
     })
-  }
-
-  private handleGameLevelReceived(clientId: string): void {
-    if (this.activeMatch || !this.isWaiting(clientId)) {
-      return
-    }
-
-    this.broadcastLobbyUpdate()
   }
 
   private handleStartNow(client: ClientConnection): void {
@@ -219,8 +188,8 @@ export class GlobalLobby {
   }
 
   // A disconnect during setup aborts the whole pending lobby: drop everyone
-  // and notify any partner, who must re-join. Keeps generated levels and seat
-  // ordering from drifting apart while players are still assembling.
+  // and notify any partner, who must re-join. Keeps the level and seat ordering
+  // from drifting apart while players are still assembling.
   // TODO(dan): Is this how we want it to work? This code will probably get replaced
   // when we have real lobbies and whatnot, so not worth too much effort right now.
   private removeWaitingClient(clientId: string): void {

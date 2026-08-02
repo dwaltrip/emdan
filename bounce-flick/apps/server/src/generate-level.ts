@@ -4,7 +4,7 @@ import {
   WALL_THICKNESS,
   WORLD_HEIGHT,
   WORLD_WIDTH,
-} from './constants'
+} from '@shared/game-config'
 import {
   offsetPolylineSegments,
   offsetPathByVertexNormal,
@@ -12,7 +12,7 @@ import {
   segmentXStops,
   segmentsYRangeOverSpan,
 } from './geometry'
-import { clamp } from './math'
+import { clamp } from '@shared/math'
 import type { Segment } from './geometry'
 import type {
   GeneratedLevel,
@@ -20,7 +20,7 @@ import type {
   SpikeDirection,
   TerrainShape,
   TerrainSpec,
-} from './types'
+} from '@shared/level'
 
 type Random = () => number
 type Range = readonly [number, number]
@@ -641,7 +641,7 @@ function appendCorridorLeg(
   minY: number,
   maxY: number,
 ) {
-  let current = path[path.length - 1]
+  let current = path[path.length - 1]!
 
   while (target.x - current.x > CORRIDOR_STEP_X[1]) {
     const remainingX = target.x - current.x
@@ -658,8 +658,8 @@ function appendCorridorLeg(
   }
 
   if (
-    path[path.length - 1].x !== target.x ||
-    path[path.length - 1].y !== target.y
+    path[path.length - 1]!.x !== target.x ||
+    path[path.length - 1]!.y !== target.y
   ) {
     path.push(target)
   }
@@ -752,7 +752,7 @@ function pickWeightedPoint(
     }
   }
 
-  const fallback = candidates[candidates.length - 1]
+  const fallback = candidates[candidates.length - 1]!
 
   return { x: fallback.x, y: fallback.y }
 }
@@ -951,13 +951,13 @@ function isPointInsideCorridor(point: Point, corridor: Corridor, margin: number)
 function corridorCenterYAt(corridor: Corridor, x: number) {
   const path = corridor.path
 
-  if (x <= path[0].x) {
-    return path[0].y
+  if (x <= path[0]!.x) {
+    return path[0]!.y
   }
 
   for (let index = 1; index < path.length; index += 1) {
-    const from = path[index - 1]
-    const to = path[index]
+    const from = path[index - 1]!
+    const to = path[index]!
 
     if (x <= to.x) {
       const progress = clamp((x - from.x) / (to.x - from.x), 0, 1)
@@ -966,7 +966,7 @@ function corridorCenterYAt(corridor: Corridor, x: number) {
     }
   }
 
-  return path[path.length - 1].y
+  return path[path.length - 1]!.y
 }
 
 function shapeBounds(shape: TerrainShape): RectBounds {
@@ -1011,8 +1011,8 @@ function nearestCorridorSample(corridor: Corridor, x: number, y: number) {
   let traveled = 0
 
   for (let index = 1; index < corridor.path.length; index += 1) {
-    const from = corridor.path[index - 1]
-    const to = corridor.path[index]
+    const from = corridor.path[index - 1]!
+    const to = corridor.path[index]!
     const dx = to.x - from.x
     const dy = to.y - from.y
     const segmentLength = Math.hypot(dx, dy)
@@ -1103,7 +1103,7 @@ function surfaceYAt(platform: Platform, x: number) {
 
 function pickGroundFill(random: Random, index: number) {
   const offset = randomInt(random, 0, GROUND_FILLS.length - 1)
-  return GROUND_FILLS[(index + offset) % GROUND_FILLS.length]
+  return GROUND_FILLS[(index + offset) % GROUND_FILLS.length]!
 }
 
 function randomInt(random: Random, min: number, max: number) {

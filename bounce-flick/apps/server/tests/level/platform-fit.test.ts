@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { BALL_RADIUS, START_X } from '../../src/game/constants'
-import { segmentYAt } from '../../src/game/geometry'
-import { generateLevel } from '../../src/game/level'
+import { BALL_RADIUS, START_X } from '@shared/game-config'
+import { generateLevel } from '../../src/generate-level'
+import { segmentYAt } from '../../src/geometry'
 import {
   corridorInnerFaces,
   finishPlatform,

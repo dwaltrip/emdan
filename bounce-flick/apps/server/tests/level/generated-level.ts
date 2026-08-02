@@ -7,15 +7,15 @@ import {
   offsetPolylineSegments,
   segmentSpanX,
   segmentsYAt,
-} from '../../src/game/geometry'
-import type { Segment } from '../../src/game/geometry'
+} from '../../src/geometry'
+import type { Segment } from '../../src/geometry'
 import type {
   GeneratedLevel,
   Point,
   PolylineShape,
   RectShape,
   TerrainSpec,
-} from '../../src/game/types'
+} from '@shared/level'
 
 // mulberry32: deterministic [0,1) PRNG, so a seed reproduces a level exactly.
 export function seededRandom(seed: number): () => number {
@@ -37,7 +37,9 @@ export function corridorInnerFaces(level: GeneratedLevel): {
     throw new Error(`expected 2 corridor walls, found ${walls.length}`)
   }
 
-  const [top, bottom] = [...walls].sort((a, b) => meanPolylineY(a) - meanPolylineY(b))
+  const sortedWalls = [...walls].sort((a, b) => meanPolylineY(a) - meanPolylineY(b))
+  const top = sortedWalls[0]!
+  const bottom = sortedWalls[1]!
 
   return {
     ceiling: wallInnerFace(top, 1), // interior is below the top wall

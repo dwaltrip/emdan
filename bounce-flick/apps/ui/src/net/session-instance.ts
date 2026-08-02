@@ -1,5 +1,3 @@
-import { generateLevel } from '../game/level'
-
 import { createSession } from './session'
 
 const WS_URL =
@@ -7,7 +5,7 @@ const WS_URL =
   `ws://${window.location.hostname}:3002`
 
 // Module-level singleton
-export const session = createSession(WS_URL, { generateLevel })
+export const session = createSession(WS_URL)
 
 if (import.meta.hot) {
   import.meta.hot.dispose(() => {

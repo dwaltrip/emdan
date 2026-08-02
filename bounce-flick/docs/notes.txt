@@ -9,6 +9,11 @@
     - clock was wrong (didn't sum total tries)
     - for emile, he kept seeing "opponent left" and we couldn't play together
 - establish human apis. unslop
-- move map generation into server
++ move map generation into server
 - multiple parallel matches
-- auto format
++ formatter
+
+git config core.hooksPath bounce-flick/scripts/git-hooks
+git config --unset core.hooksPath
+
+Do a single commit without the hook: git commit --no-verify

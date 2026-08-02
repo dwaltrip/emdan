@@ -1,4 +1,4 @@
-import type { Point } from './types'
+import type { Point } from '@shared/level'
 
 export type Segment = {
   from: Point
@@ -20,7 +20,7 @@ export function pathLength(path: Point[]) {
   let length = 0
 
   for (let index = 1; index < path.length; index += 1) {
-    length += distanceBetween(path[index - 1], path[index])
+    length += distanceBetween(path[index - 1]!, path[index]!)
   }
 
   return length
@@ -30,7 +30,7 @@ export function polylineSegments(points: Point[]): Segment[] {
   const segments: Segment[] = []
 
   for (let index = 1; index < points.length; index += 1) {
-    segments.push({ from: points[index - 1], to: points[index] })
+    segments.push({ from: points[index - 1]!, to: points[index]! })
   }
 
   return segments
@@ -204,8 +204,8 @@ function segmentNormal(segment: Segment): Point {
 }
 
 function pathPointNormal(path: Point[], index: number) {
-  const previous = path[Math.max(0, index - 1)]
-  const next = path[Math.min(path.length - 1, index + 1)]
+  const previous = path[Math.max(0, index - 1)]!
+  const next = path[Math.min(path.length - 1, index + 1)]!
   const dx = next.x - previous.x
   const dy = next.y - previous.y
   const length = Math.hypot(dx, dy) || 1

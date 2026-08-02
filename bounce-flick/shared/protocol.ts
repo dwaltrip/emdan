@@ -18,8 +18,6 @@ export const MAX_PLAYERS = 8
 export type ClientMessage =
   | { type: 'join-lobby' }
   | { type: 'start-now' }
-  | { type: 'level-ready'; level: GeneratedLevel }
-  | { type: 'game-level-received' }
   | { type: 'ball-update'; x: number; y: number }
   | { type: 'player-finished'; elapsedMs: number }
 
@@ -27,7 +25,6 @@ export type ClientMessage =
 export type ServerMessage =
   | { type: 'welcome'; seat: PlayerSeat }
   | { type: 'lobby-update'; playersConnected: number; requiredPlayers: number; ready: boolean }
-  | { type: 'generate-level-request' }
   | { type: 'game-level'; level: GeneratedLevel }
   | { type: 'start-game' }
   | { type: 'state-update'; positions: Record<PlayerSeat, BallPosition | null> }
@@ -58,10 +55,6 @@ export function parseClientMessage(raw: string): ClientMessage | null {
       return { type: 'join-lobby' }
     case 'start-now':
       return { type: 'start-now' }
-    case 'level-ready':
-      return isGeneratedLevel(parsed.level) ? { type: 'level-ready', level: parsed.level } : null
-    case 'game-level-received':
-      return { type: 'game-level-received' }
     case 'ball-update':
       return typeof parsed.x === 'number' && typeof parsed.y === 'number'
         ? { type: 'ball-update', x: parsed.x, y: parsed.y }
@@ -98,8 +91,6 @@ export function parseServerMessage(raw: string): ServerMessage | null {
         requiredPlayers: parsed.requiredPlayers,
         ready: parsed.ready,
       }
-    case 'generate-level-request':
-      return { type: 'generate-level-request' }
     case 'game-level':
       return isGeneratedLevel(parsed.level) ? { type: 'game-level', level: parsed.level } : null
     case 'start-game':
