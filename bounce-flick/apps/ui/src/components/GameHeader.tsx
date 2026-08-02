@@ -5,14 +5,12 @@ type GameHeaderProps = {
   hud: HudSnapshot
   onClearDrawings: () => void
   onEraseRecentInk: () => void
-  onRestart: () => void
 }
 
 export function GameHeader({
   hud,
   onClearDrawings,
   onEraseRecentInk,
-  onRestart,
 }: GameHeaderProps) {
   return (
     <header className="game-topbar">
@@ -32,9 +30,6 @@ export function GameHeader({
         </button>
         <button type="button" onClick={onClearDrawings}>
           Clear ink
-        </button>
-        <button type="button" className="primary-action" onClick={onRestart}>
-          Restart
         </button>
       </div>
     </header>

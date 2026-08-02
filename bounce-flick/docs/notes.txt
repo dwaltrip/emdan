@@ -1,6 +1,6 @@
 + undo most recent sections of ink
 - sometimes viewport doesn't track ball when there is a sharp downward drop in the channel
-- level should auto restart instead of click button to restart
++ level should auto restart instead of click button to restart
 - experiment with physics
     - should ball bounce or slide on objects. maybe multiple kinds of surfaces
     - should ball bounce or slide on ink

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { INITIAL_HUD } from '../game/constants'
 import type { GameActions, GeneratedLevel } from '../game/types'
@@ -7,9 +7,9 @@ import { session } from '../net/session-instance'
 import { GameHeader } from './GameHeader'
 import { GameStage } from './GameStage'
 
+const AUTO_RESTART_DELAY_MS = 600
+
 export function Game({ level }: { level: GeneratedLevel }) {
-  // Restart re-runs the same level by remounting `GameRun` with key bump.
-  // Remounting tears down and rebuilds the runtime (see `useBounceFlickGame`).
   const [runKey, setRunKey] = useState(0)
   const restart = useCallback(() => setRunKey((key) => key + 1), [])
 
@@ -41,6 +41,15 @@ function GameRun({
 
   useBounceFlickGame({ actionsRef, canvasRef, level, net, setHud })
 
+  useEffect(() => {
+    if (hud.phase !== 'crashed') {
+      return
+    }
+
+    const timeoutId = window.setTimeout(onRestart, AUTO_RESTART_DELAY_MS)
+    return () => window.clearTimeout(timeoutId)
+  }, [hud.phase, onRestart])
+
   const clearDrawings = useCallback(() => {
     actionsRef.current?.clearDrawings()
   }, [])
@@ -55,7 +64,6 @@ function GameRun({
         hud={hud}
         onClearDrawings={clearDrawings}
         onEraseRecentInk={eraseRecentInk}
-        onRestart={onRestart}
       />
       <GameStage canvasRef={canvasRef} hud={hud} />
     </main>
