@@ -11,12 +11,28 @@ const AUTO_RESTART_DELAY_MS = 600;
 
 export function Game({ level }: { level: GeneratedLevel }) {
   const [runKey, setRunKey] = useState(0);
+  const [levelStartedAt] = useState(() => performance.now());
   const restart = useCallback(() => setRunKey((key) => key + 1), []);
 
-  return <GameRun key={runKey} level={level} onRestart={restart} />;
+  return (
+    <GameRun
+      key={runKey}
+      level={level}
+      levelStartedAt={levelStartedAt}
+      onRestart={restart}
+    />
+  );
 }
 
-function GameRun({ level, onRestart }: { level: GeneratedLevel; onRestart: () => void }) {
+function GameRun({
+  level,
+  levelStartedAt,
+  onRestart,
+}: {
+  level: GeneratedLevel;
+  levelStartedAt: number;
+  onRestart: () => void;
+}) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const actionsRef = useRef<GameActions | null>(null);
   const [hud, setHud] = useState(INITIAL_HUD);
@@ -33,7 +49,7 @@ function GameRun({ level, onRestart }: { level: GeneratedLevel; onRestart: () =>
     [],
   );
 
-  useBounceFlickGame({ actionsRef, canvasRef, level, net, setHud });
+  useBounceFlickGame({ actionsRef, canvasRef, level, levelStartedAt, net, setHud });
 
   useEffect(() => {
     if (hud.phase !== 'crashed') {

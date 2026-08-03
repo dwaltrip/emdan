@@ -27,6 +27,7 @@ type UseBounceFlickGameParams = {
     current: HTMLCanvasElement | null;
   };
   level: GeneratedLevel;
+  levelStartedAt: number;
   net?: NetBridge;
   setHud: (snapshot: HudSnapshot) => void;
 };
@@ -35,6 +36,7 @@ export function useBounceFlickGame({
   actionsRef,
   canvasRef,
   level,
+  levelStartedAt,
   net,
   setHud,
 }: UseBounceFlickGameParams) {
@@ -67,7 +69,6 @@ export function useBounceFlickGame({
 
     let lastFrame = performance.now();
     let accumulator = 0;
-    const startedAt = performance.now();
     let reportedFinish = false;
 
     const frame = (now: number) => {
@@ -88,7 +89,7 @@ export function useBounceFlickGame({
 
         if (runtime.phase === 'cleared' && !reportedFinish) {
           reportedFinish = true;
-          net.reportFinish(performance.now() - startedAt);
+          net.reportFinish(performance.now() - levelStartedAt);
         }
       }
 
@@ -138,5 +139,5 @@ export function useBounceFlickGame({
         actionsRef.current = null;
       }
     };
-  }, [actionsRef, canvasRef, level, net, setHud]);
+  }, [actionsRef, canvasRef, level, levelStartedAt, net, setHud]);
 }
