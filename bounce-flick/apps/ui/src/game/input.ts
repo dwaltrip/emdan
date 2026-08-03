@@ -1,5 +1,6 @@
 import { addInkSegment, clampDrawingPoint } from './physics';
-import type { Point, Runtime } from './types';
+import { screenToWorld } from './view';
+import type { Point, Runtime, ViewState } from './types';
 
 type PublishHud = (force?: boolean) => void;
 
@@ -8,7 +9,7 @@ type KeyboardActions = {
   eraseRecentInk: () => void;
 };
 
-export function bindKeyboardControls(runtime: Runtime, actions: KeyboardActions) {
+export function bindKeyboardControls(view: ViewState, actions: KeyboardActions) {
   const handleKeyDown = (event: KeyboardEvent) => {
     if (isEditableEventTarget(event.target)) {
       return;
@@ -16,29 +17,17 @@ export function bindKeyboardControls(runtime: Runtime, actions: KeyboardActions)
 
     if (event.code === 'Space') {
       event.preventDefault();
-      runtime.cameraFrozen = true;
+      view.cameraFrozen = true;
       return;
     }
 
-    if (
-      event.code === 'KeyC' &&
-      !event.repeat &&
-      !event.altKey &&
-      !event.ctrlKey &&
-      !event.metaKey
-    ) {
+    if (isPlainKey(event, 'KeyC')) {
       event.preventDefault();
       actions.clearDrawings();
       return;
     }
 
-    if (
-      event.code === 'KeyZ' &&
-      !event.repeat &&
-      !event.altKey &&
-      !event.ctrlKey &&
-      !event.metaKey
-    ) {
+    if (isPlainKey(event, 'KeyZ')) {
       event.preventDefault();
       actions.eraseRecentInk();
     }
@@ -48,13 +37,11 @@ export function bindKeyboardControls(runtime: Runtime, actions: KeyboardActions)
     if (event.code !== 'Space') {
       return;
     }
-
     event.preventDefault();
-    runtime.cameraFrozen = false;
+    view.cameraFrozen = false;
   };
-
   const handleBlur = () => {
-    runtime.cameraFrozen = false;
+    view.cameraFrozen = false;
   };
 
   window.addEventListener('keydown', handleKeyDown);
@@ -71,16 +58,31 @@ export function bindKeyboardControls(runtime: Runtime, actions: KeyboardActions)
 export function bindPointerControls(
   canvas: HTMLCanvasElement,
   runtime: Runtime,
+  view: ViewState,
   publishHud: PublishHud,
 ) {
-  const cancelActiveStroke = () => {
-    if (runtime.pointerId !== null && canvas.hasPointerCapture(runtime.pointerId)) {
-      canvas.releasePointerCapture(runtime.pointerId);
-    }
+  let pointerId: number | null = null;
+  let lastPointer: Point | null = null;
+  let pointerScreen: Point | null = null;
 
-    runtime.pointerId = null;
-    runtime.lastPointer = null;
-    runtime.pointerScreen = null;
+  const cancelActiveStroke = () => {
+    if (pointerId !== null && canvas.hasPointerCapture(pointerId)) {
+      canvas.releasePointerCapture(pointerId);
+    }
+    pointerId = null;
+    lastPointer = null;
+    pointerScreen = null;
+  };
+
+  const extendStroke = (screenPoint: Point) => {
+    if (!lastPointer) {
+      return;
+    }
+    lastPointer = addInkSegment(
+      runtime,
+      lastPointer,
+      clampDrawingPoint(screenToWorld(view, screenPoint)),
+    );
   };
 
   const handlePointerDown = (event: PointerEvent) => {
@@ -90,31 +92,26 @@ export function bindPointerControls(
 
     event.preventDefault();
     canvas.setPointerCapture(event.pointerId);
-    const pointerScreen = eventToCanvasPoint(canvas, event);
-    runtime.pointerId = event.pointerId;
-    runtime.pointerScreen = pointerScreen;
-    runtime.lastPointer = clampDrawingPoint(canvasPointToWorld(runtime, pointerScreen));
+    pointerId = event.pointerId;
+    pointerScreen = eventToCanvasPoint(canvas, event);
+    lastPointer = clampDrawingPoint(screenToWorld(view, pointerScreen));
   };
 
   const handlePointerMove = (event: PointerEvent) => {
-    if (runtime.pointerId !== event.pointerId || !runtime.lastPointer) {
+    if (pointerId !== event.pointerId) {
       return;
     }
 
     event.preventDefault();
-    const pointerScreen = eventToCanvasPoint(canvas, event);
-    runtime.pointerScreen = pointerScreen;
-    const target = clampDrawingPoint(canvasPointToWorld(runtime, pointerScreen));
-    runtime.lastPointer = addInkSegment(runtime, runtime.lastPointer, target);
+    pointerScreen = eventToCanvasPoint(canvas, event);
+    extendStroke(pointerScreen);
     publishHud(true);
   };
 
   const endPointer = (event: PointerEvent) => {
-    if (runtime.pointerId !== event.pointerId) {
-      return;
+    if (pointerId === event.pointerId) {
+      cancelActiveStroke();
     }
-
-    cancelActiveStroke();
   };
 
   canvas.addEventListener('pointerdown', handlePointerDown);
@@ -124,6 +121,12 @@ export function bindPointerControls(
 
   return {
     cancelActiveStroke,
+    isDrawing: () => pointerId !== null,
+    syncAfterCameraMove: () => {
+      if (pointerScreen) {
+        extendStroke(pointerScreen);
+      }
+    },
     cleanup: () => {
       canvas.removeEventListener('pointerdown', handlePointerDown);
       canvas.removeEventListener('pointermove', handlePointerMove);
@@ -135,18 +138,11 @@ export function bindPointerControls(
 
 function eventToCanvasPoint(canvas: HTMLCanvasElement, event: PointerEvent): Point {
   const bounds = canvas.getBoundingClientRect();
-
-  return {
-    x: event.clientX - bounds.left,
-    y: event.clientY - bounds.top,
-  };
+  return { x: event.clientX - bounds.left, y: event.clientY - bounds.top };
 }
 
-function canvasPointToWorld(runtime: Runtime, point: Point): Point {
-  return {
-    x: point.x + runtime.cameraX,
-    y: point.y + runtime.cameraY,
-  };
+function isPlainKey(event: KeyboardEvent, code: string) {
+  return event.code === code && !event.repeat && !event.altKey && !event.ctrlKey && !event.metaKey;
 }
 
 function isEditableEventTarget(target: EventTarget | null) {

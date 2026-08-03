@@ -1,50 +1,42 @@
-// Plain, serializable level types. The server generates a level and sends it
-// to every player, so these live in shared/ alongside the generator and wire
-// protocol. Matter-backed runtime types (TerrainPiece, Runtime) stay in the UI.
+// Plain, serializable game concepts. The server generates these values and the
+// client decides how to turn them into Matter bodies and canvas visuals.
 
 export type Point = {
   x: number;
   y: number;
 };
 
-export type SpikeDirection = 'up' | 'down' | 'left' | 'right';
-
-export type TerrainKind = 'wall' | 'object' | 'finish';
-
-export type RectShape = {
+export type Rect = {
   angle?: number;
   height: number;
-  type: 'rect';
   width: number;
   x: number;
   y: number;
 };
 
-export type PolylineShape = {
+export type WallSpec = {
   points: Point[];
-  thickness: number;
-  type: 'polyline';
+  type: 'wall';
 };
 
-export type TerrainShape = PolylineShape | RectShape;
+export type PlatformRole = 'start' | 'scattered' | 'finish';
 
-export type TerrainStyle = {
-  fill: string;
-  spikes?: SpikeDirection;
-  stroke: string;
+export type PlatformSpec = {
+  rect: Rect;
+  role: PlatformRole;
+  skin: number;
+  type: 'platform';
 };
 
-export type TerrainSpec = {
-  deadly: boolean;
-  kind: TerrainKind;
-  shape: TerrainShape;
-  style: TerrainStyle;
+export type HazardSpec = {
+  rect: Rect;
+  type: 'hazard';
 };
+
+export type LevelPiece = WallSpec | PlatformSpec | HazardSpec;
 
 export type GeneratedLevel = {
-  finishPlatformIndex?: number;
-  finishX: number;
-  startPlatformIndex?: number;
-  startY: number;
-  terrain: TerrainSpec[];
+  goal: Rect;
+  pieces: LevelPiece[];
+  spawn: Point;
 };

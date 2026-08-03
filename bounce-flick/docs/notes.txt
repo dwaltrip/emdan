@@ -8,7 +8,7 @@
 - there were some two-player bugs that i don't quite remember
     + clock was wrong (didn't sum total tries)
     - for emile, he kept seeing "opponent left" and we couldn't play together
-- establish human apis. unslop
++ establish human apis. unslop
 + move map generation into server
 - multiple parallel matches
 + formatter

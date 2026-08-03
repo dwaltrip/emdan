@@ -1,18 +1,16 @@
 import type * as Matter from 'matter-js';
 
-import type { Point, TerrainKind, TerrainShape, TerrainStyle } from '@shared/level';
+import type { LevelPiece, Point } from '@shared/level';
 
-// Re-export shared types for easier use in `apps/ui`
 export type {
   GeneratedLevel,
+  HazardSpec,
+  LevelPiece,
+  PlatformRole,
+  PlatformSpec,
   Point,
-  PolylineShape,
-  RectShape,
-  SpikeDirection,
-  TerrainKind,
-  TerrainShape,
-  TerrainSpec,
-  TerrainStyle,
+  Rect,
+  WallSpec,
 } from '@shared/level';
 
 export type Phase = 'running' | 'cleared' | 'crashed';
@@ -34,34 +32,25 @@ export type InkSegment = {
 export type TerrainPiece = {
   bodies: Matter.Body[];
   bounds: Matter.Bounds;
-  deadly: boolean;
-  kind: TerrainKind;
-  shape: TerrainShape;
-  style: TerrainStyle;
-};
-
-export type GameActions = {
-  clearDrawings: () => void;
-  eraseRecentInk: () => void;
+  spec: LevelPiece;
 };
 
 export type Runtime = {
   ball: Matter.Body;
+  engine: Matter.Engine;
+  goal: Matter.Body;
+  goalX: number;
+  ink: number;
+  inkSegments: InkSegment[];
+  phase: Phase;
+  startX: number;
+  terrain: TerrainPiece[];
+};
+
+export type ViewState = {
   cameraFrozen: boolean;
   cameraX: number;
   cameraY: number;
-  engine: Matter.Engine;
-  finishX: number;
-  ink: number;
-  inkSegments: InkSegment[];
-  lastHudAt: number;
-  lastPointer: Point | null;
-  ghostBalls: Point[];
-  pointerScreen: Point | null;
-  phase: Phase;
-  pointerId: number | null;
-  rafId: number;
-  terrain: TerrainPiece[];
   viewportHeight: number;
   viewportWidth: number;
 };

@@ -1,152 +1,113 @@
-import type {
-  BallPosition,
-  GeneratedLevel,
-  MatchEndReason,
-  MatchWinner,
-  PlayerSeat,
-  ServerMessage,
-} from '@shared/protocol';
+import type { GeneratedLevel, MatchOutcome, PlayerSeat, ServerMessage } from '@shared/protocol';
+import type { Point } from '@shared/level';
 
 import { createGameSocket, type GameSocketHandle } from './game-socket';
 
-export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected';
+export type MatchResult = {
+  outcome: MatchOutcome;
+  seat: PlayerSeat;
+};
 
-export interface LobbyStatus {
-  playersConnected: number;
-  requiredPlayers: number;
-  ready: boolean;
-}
+export type JoinState =
+  | { phase: 'connecting' }
+  | { phase: 'disconnected' }
+  | { phase: 'idle' }
+  | { phase: 'lobby'; canStart: boolean; playersConnected: number };
 
-export interface MatchResult {
-  reason: MatchEndReason;
-  winner: MatchWinner | null;
-  times: Record<PlayerSeat, number | null>;
-  seat: PlayerSeat | null;
-}
+export type SessionState =
+  | JoinState
+  | { phase: 'playing'; level: GeneratedLevel }
+  | { phase: 'ended'; result: MatchResult };
 
-export interface SessionState {
-  status: ConnectionStatus;
-  seat: PlayerSeat | null;
-  lobby: LobbyStatus | null;
-  // Server-generated level for the current match.
-  level: GeneratedLevel | null;
-  started: boolean;
-  result: MatchResult | null;
-}
-
-// State that lives outside of the React render process.
-// Live multiplayer game state. Rendered by `game.renderer`.
-export interface LiveState {
-  ghostBalls: BallPosition[];
+export interface Multiplayer {
+  finish: () => void;
+  publishPosition: (position: Point) => void;
+  readPeers: () => readonly Point[];
 }
 
 export interface Session {
-  live: LiveState;
-
-  getState: () => SessionState;
-  subscribe: (listener: () => void) => () => void;
-  joinLobby: () => void;
-  startNow: () => void;
   end: () => void;
-  sendBall: (x: number, y: number) => void;
-  reportFinish: (elapsedMs: number) => void;
+  getState: () => SessionState;
+  joinLobby: () => void;
+  multiplayer: Multiplayer;
+  startNow: () => void;
+  subscribe: (listener: () => void) => () => void;
 }
 
 export function createSession(url: string): Session {
-  let state: SessionState = {
-    status: 'connecting',
-    seat: null,
-    lobby: null,
-    level: null,
-    started: false,
-    result: null,
-  };
+  let state: SessionState = { phase: 'connecting' };
+  let seat: PlayerSeat | null = null;
+  let peerPositions: Point[] = [];
   const listeners = new Set<() => void>();
-  const live: LiveState = { ghostBalls: [] };
 
-  function setState(patch: Partial<SessionState>): void {
-    state = { ...state, ...patch };
-    for (const listener of listeners) {
-      listener();
-    }
+  function setState(next: SessionState): void {
+    state = next;
+    listeners.forEach((listener) => listener());
   }
-
-  let socket: GameSocketHandle;
 
   function handleMessage(message: ServerMessage): void {
     switch (message.type) {
-      case 'welcome':
-        setState({ seat: message.seat });
-        return;
       case 'lobby-update':
         setState({
-          lobby: {
-            playersConnected: message.playersConnected,
-            requiredPlayers: message.requiredPlayers,
-            ready: message.ready,
-          },
+          phase: 'lobby',
+          canStart: message.canStart,
+          playersConnected: message.playersConnected,
         });
         return;
-      case 'game-level':
-        setState({ level: message.level });
+      case 'match-started':
+        seat = message.seat;
+        peerPositions = [];
+        setState({ phase: 'playing', level: message.level });
         return;
-      case 'start-game':
-        setState({ started: true });
+      case 'state-update':
+        peerPositions = message.players.flatMap((player) =>
+          player.seat === seat ? [] : [player.position],
+        );
         return;
-      case 'state-update': {
-        // Multiplayer game updates. Rendered to game canvas, no React.
-        live.ghostBalls = Object.entries(message.positions).flatMap(([seat, position]) => {
-          if (seat === state.seat || position === null) {
-            return [];
-          }
+      case 'match-ended': {
+        if (seat === null) {
+          console.warn('[session] match ended before a seat was assigned');
+          return;
+        }
 
-          return [position];
-        });
+        const result = { outcome: message.outcome, seat };
+        seat = null;
+        peerPositions = [];
+        setState({ phase: 'ended', result });
         return;
       }
-      case 'match-ended':
-        live.ghostBalls = [];
-        setState({
-          result: {
-            reason: message.reason,
-            winner: message.winner,
-            times: message.times,
-            seat: state.seat,
-          },
-          seat: null,
-          lobby: null,
-          level: null,
-          started: false,
-        });
-        return;
       case 'error':
         console.warn('[session] server error', message.code, message.message);
         return;
     }
   }
 
+  let socket: GameSocketHandle;
   socket = createGameSocket(url, {
-    onOpen: () => setState({ status: 'connected' }),
-    onClose: () => setState({ status: 'disconnected' }),
+    onOpen: () => setState({ phase: 'idle' }),
+    onClose: () => {
+      seat = null;
+      peerPositions = [];
+      setState({ phase: 'disconnected' });
+    },
     onMessage: handleMessage,
   });
 
   return {
+    end: () => socket.close(),
     getState: () => state,
+    joinLobby: () => socket.send({ type: 'join-lobby' }),
+    multiplayer: {
+      finish: () => socket.send({ type: 'player-finished' }),
+      publishPosition: (position) => socket.send({ type: 'ball-update', position }),
+      readPeers: () => peerPositions,
+    },
+    startNow: () => socket.send({ type: 'start-now' }),
     subscribe: (listener) => {
       listeners.add(listener);
       return () => {
         listeners.delete(listener);
       };
     },
-    joinLobby: () => {
-      setState({ result: null });
-      socket.send({ type: 'join-lobby' });
-    },
-    startNow: () => socket.send({ type: 'start-now' }),
-    end: () => socket.close(),
-    live,
-    sendBall: (x, y) => socket.send({ type: 'ball-update', x, y }),
-    reportFinish: (elapsedMs) => socket.send({ type: 'player-finished', elapsedMs }),
   };
 }

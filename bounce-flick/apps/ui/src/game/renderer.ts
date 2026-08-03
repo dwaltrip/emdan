@@ -1,66 +1,58 @@
 import type * as Matter from 'matter-js';
-import { BALL_RADIUS, INK_THICKNESS, WORLD_HEIGHT, WORLD_WIDTH } from './constants';
-import { clamp } from './math';
-import { addInkSegment, clampDrawingPoint } from './physics';
-import type { InkSegment, PolylineShape, Runtime, SpikeDirection, TerrainStyle } from './types';
+import { BALL_RADIUS, INK_THICKNESS, WALL_THICKNESS } from './constants';
+import type { InkSegment, Point, Runtime, ViewState } from './types';
 
-export function resizeCanvas(
-  canvas: HTMLCanvasElement,
+const PLATFORM_STROKE = '#142f36';
+const PLATFORM_FILLS = [
+  '#2c6470',
+  '#245761',
+  '#31675a',
+  '#2f5f68',
+  '#2f6b61',
+  '#275965',
+  '#35655c',
+];
+const WALL_FILL = '#244f58';
+const WALL_STROKE = '#142f36';
+const HAZARD_FILL = '#e14d42';
+const HAZARD_STROKE = '#7f201b';
+
+export function renderScene(
   context: CanvasRenderingContext2D,
   runtime: Runtime,
+  view: ViewState,
+  ghostBalls: readonly Point[] = [],
 ) {
-  const bounds = canvas.getBoundingClientRect();
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  const width = Math.max(320, bounds.width);
-  const height = Math.max(420, bounds.height);
-
-  canvas.width = Math.floor(width * dpr);
-  canvas.height = Math.floor(height * dpr);
-  context.setTransform(dpr, 0, 0, dpr, 0, 0);
-  runtime.viewportWidth = width;
-  runtime.viewportHeight = height;
-}
-
-export function renderScene(context: CanvasRenderingContext2D, runtime: Runtime) {
-  updateCamera(runtime);
-  context.clearRect(0, 0, runtime.viewportWidth, runtime.viewportHeight);
+  context.clearRect(0, 0, view.viewportWidth, view.viewportHeight);
 
   context.save();
-  context.translate(-runtime.cameraX, -runtime.cameraY);
+  context.translate(-view.cameraX, -view.cameraY);
 
-  const viewLeft = runtime.cameraX - 160;
-  const viewRight = runtime.cameraX + runtime.viewportWidth + 160;
+  const viewLeft = view.cameraX - 160;
+  const viewRight = view.cameraX + view.viewportWidth + 160;
 
   runtime.terrain.forEach((piece) => {
     if (piece.bounds.max.x < viewLeft || piece.bounds.min.x > viewRight) {
       return;
     }
 
-    if (piece.kind === 'finish') {
-      drawFinishGate(context, piece.bodies[0]);
+    const { spec } = piece;
+    if (spec.type === 'wall') {
+      drawWall(context, spec.points);
       return;
     }
 
-    if (piece.shape.type === 'polyline') {
-      drawPolyline(context, piece.shape, piece.style);
-      return;
-    }
-
-    if (piece.style.spikes) {
-      drawSpikes(
-        context,
-        piece.bodies[0],
-        piece.style.fill,
-        piece.style.stroke,
-        piece.style.spikes,
-      );
+    if (spec.type === 'hazard') {
+      piece.bodies.forEach((body) => drawHazard(context, body));
       return;
     }
 
     piece.bodies.forEach((body) => {
-      drawBody(context, body, piece.style.fill, piece.style.stroke);
+      drawBody(context, body, platformFill(spec.skin), PLATFORM_STROKE);
     });
   });
+
+  drawFinishGate(context, runtime.goal);
 
   runtime.inkSegments.forEach((segment) => {
     const minX = Math.min(segment.from.x, segment.to.x);
@@ -72,7 +64,7 @@ export function renderScene(context: CanvasRenderingContext2D, runtime: Runtime)
 
   drawBall(context, runtime.ball);
 
-  runtime.ghostBalls.forEach((ghostBall) => {
+  ghostBalls.forEach((ghostBall) => {
     drawGhostBall(context, ghostBall.x, ghostBall.y);
   });
 
@@ -80,46 +72,12 @@ export function renderScene(context: CanvasRenderingContext2D, runtime: Runtime)
 
   if (runtime.phase !== 'running') {
     context.fillStyle = 'rgba(247, 248, 251, 0.28)';
-    context.fillRect(0, 0, runtime.viewportWidth, runtime.viewportHeight);
+    context.fillRect(0, 0, view.viewportWidth, view.viewportHeight);
   }
 }
 
-function updateCamera(runtime: Runtime) {
-  if (runtime.cameraFrozen) {
-    return;
-  }
-
-  const previousCameraX = runtime.cameraX;
-  const previousCameraY = runtime.cameraY;
-  const maxCameraX = Math.max(0, WORLD_WIDTH - runtime.viewportWidth);
-  const targetX = clamp(runtime.ball.position.x - runtime.viewportWidth * 0.34, 0, maxCameraX);
-  const maxCameraY = Math.max(0, WORLD_HEIGHT - runtime.viewportHeight);
-  const targetY = clamp(runtime.ball.position.y - runtime.viewportHeight * 0.44, 0, maxCameraY);
-
-  runtime.cameraX += (targetX - runtime.cameraX) * 0.09;
-
-  if (runtime.pointerId === null) {
-    runtime.cameraY += (targetY - runtime.cameraY) * 0.11;
-  }
-
-  dragActivePointer(runtime, previousCameraX, previousCameraY);
-}
-
-function dragActivePointer(runtime: Runtime, previousCameraX: number, previousCameraY: number) {
-  if (
-    runtime.pointerId === null ||
-    !runtime.lastPointer ||
-    !runtime.pointerScreen ||
-    (runtime.cameraX === previousCameraX && runtime.cameraY === previousCameraY)
-  ) {
-    return;
-  }
-
-  const target = clampDrawingPoint({
-    x: runtime.pointerScreen.x + runtime.cameraX,
-    y: runtime.pointerScreen.y + runtime.cameraY,
-  });
-  runtime.lastPointer = addInkSegment(runtime, runtime.lastPointer, target);
+function platformFill(skin: number) {
+  return PLATFORM_FILLS[Math.abs(Math.trunc(skin)) % PLATFORM_FILLS.length]!;
 }
 
 function drawBody(
@@ -128,6 +86,15 @@ function drawBody(
   fill: string,
   stroke: string,
 ) {
+  bodyPath(context, body);
+  context.fillStyle = fill;
+  context.fill();
+  context.lineWidth = 2;
+  context.strokeStyle = stroke;
+  context.stroke();
+}
+
+function bodyPath(context: CanvasRenderingContext2D, body: Matter.Body) {
   context.beginPath();
   body.vertices.forEach((vertex, index) => {
     if (index === 0) {
@@ -138,19 +105,10 @@ function drawBody(
     context.lineTo(vertex.x, vertex.y);
   });
   context.closePath();
-  context.fillStyle = fill;
-  context.fill();
-  context.lineWidth = 2;
-  context.strokeStyle = stroke;
-  context.stroke();
 }
 
-function drawPolyline(
-  context: CanvasRenderingContext2D,
-  shape: PolylineShape,
-  style: TerrainStyle,
-) {
-  if (shape.points.length < 2) {
+function drawWall(context: CanvasRenderingContext2D, points: Point[]) {
+  if (points.length < 2) {
     return;
   }
 
@@ -159,7 +117,7 @@ function drawPolyline(
   context.lineJoin = 'round';
 
   context.beginPath();
-  shape.points.forEach((point, index) => {
+  points.forEach((point, index) => {
     if (index === 0) {
       context.moveTo(point.x, point.y);
       return;
@@ -168,72 +126,39 @@ function drawPolyline(
     context.lineTo(point.x, point.y);
   });
 
-  context.lineWidth = shape.thickness + 4;
-  context.strokeStyle = style.stroke;
+  context.lineWidth = WALL_THICKNESS + 4;
+  context.strokeStyle = WALL_STROKE;
   context.stroke();
 
-  context.lineWidth = shape.thickness;
-  context.strokeStyle = style.fill;
+  context.lineWidth = WALL_THICKNESS;
+  context.strokeStyle = WALL_FILL;
   context.stroke();
   context.restore();
 }
 
-function drawSpikes(
-  context: CanvasRenderingContext2D,
-  body: Matter.Body,
-  fill: string,
-  stroke: string,
-  direction: SpikeDirection,
-) {
+function drawHazard(context: CanvasRenderingContext2D, body: Matter.Body) {
+  drawBody(context, body, HAZARD_FILL, HAZARD_STROKE);
+
   const { min, max } = body.bounds;
-  const width = max.x - min.x;
   const height = max.y - min.y;
 
-  if (direction === 'left' || direction === 'right') {
-    const spikes = Math.max(4, Math.floor(height / 26));
-    const spikeHeight = height / spikes;
-    const pointsLeft = direction === 'left';
-    const baseX = pointsLeft ? max.x - 4 : min.x + 4;
-    const pointX = pointsLeft ? min.x + 2 : max.x - 2;
-
-    context.fillStyle = fill;
-    context.strokeStyle = stroke;
-    context.lineWidth = 2;
-
-    for (let index = 0; index < spikes; index += 1) {
-      const top = min.y + index * spikeHeight;
-      context.beginPath();
-      context.moveTo(baseX, top + spikeHeight * 0.08);
-      context.lineTo(pointX, top + spikeHeight * 0.5);
-      context.lineTo(baseX, top + spikeHeight * 0.92);
-      context.closePath();
-      context.fill();
-      context.stroke();
-    }
-
-    return;
-  }
-
-  const spikes = Math.max(4, Math.floor(width / 26));
-  const spikeWidth = width / spikes;
-  const pointsUp = direction !== 'down';
-  const baseY = pointsUp ? max.y - 6 : min.y + 6;
-  const pointY = pointsUp ? min.y + 2 : max.y - 2;
-
-  context.fillStyle = fill;
-  context.strokeStyle = stroke;
-  context.lineWidth = 2;
-
-  for (let index = 0; index < spikes; index += 1) {
-    const left = min.x + index * spikeWidth;
+  context.save();
+  bodyPath(context, body);
+  context.clip();
+  context.lineWidth = 6;
+  context.strokeStyle = 'rgba(255, 238, 190, 0.7)';
+  for (let x = min.x - height; x < max.x; x += 20) {
     context.beginPath();
-    context.moveTo(left + spikeWidth * 0.08, baseY);
-    context.lineTo(left + spikeWidth * 0.5, pointY);
-    context.lineTo(left + spikeWidth * 0.92, baseY);
-    context.closePath();
-    context.fill();
+    context.moveTo(x, min.y);
+    context.lineTo(x + height, max.y);
     context.stroke();
   }
+  context.restore();
+
+  bodyPath(context, body);
+  context.lineWidth = 3;
+  context.strokeStyle = HAZARD_STROKE;
+  context.stroke();
 }
 
 function drawFinishGate(context: CanvasRenderingContext2D, body: Matter.Body) {

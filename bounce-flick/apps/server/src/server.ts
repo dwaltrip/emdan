@@ -1,16 +1,22 @@
 import { randomUUID } from 'node:crypto';
 import WebSocket, { WebSocketServer, type RawData } from 'ws';
 
-import { parseClientMessage, serializeServerMessage } from '@shared/protocol';
+import type { ServerMessage } from '@shared/protocol';
+import { parseClientMessage } from './client-message';
+import type { ClientConnection } from './connection';
 import { GlobalLobby } from './lobby';
 
 function initServer(websocketServer: WebSocketServer) {
   const lobby = new GlobalLobby();
 
   websocketServer.on('connection', (socket) => {
-    const client = {
+    const client: ClientConnection = {
       id: randomUUID(),
-      socket,
+      send: (message: ServerMessage) => {
+        if (socket.readyState === WebSocket.OPEN) {
+          socket.send(JSON.stringify(message));
+        }
+      },
     };
 
     lobby.addConnection(client);
@@ -18,15 +24,11 @@ function initServer(websocketServer: WebSocketServer) {
     socket.on('message', (rawMessage: RawData) => {
       const message = parseClientMessage(normalizeRawMessage(rawMessage));
       if (!message) {
-        if (socket.readyState === WebSocket.OPEN) {
-          socket.send(
-            serializeServerMessage({
-              type: 'error',
-              code: 'invalid-message',
-              message: 'Could not parse the websocket payload.',
-            }),
-          );
-        }
+        client.send({
+          type: 'error',
+          code: 'invalid-message',
+          message: 'Could not parse the websocket payload.',
+        });
         return;
       }
 

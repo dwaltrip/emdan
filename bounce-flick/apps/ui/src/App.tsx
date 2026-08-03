@@ -8,22 +8,15 @@ import { session } from './net/session-instance';
 function App() {
   const state = useSession();
 
-  if (state.result) {
+  if (state.phase === 'ended') {
     return <ResultScreen result={state.result} onPlayAgain={session.joinLobby} />;
   }
 
-  if (state.started && state.level) {
-    return <Game level={state.level} />;
+  if (state.phase === 'playing') {
+    return <Game level={state.level} multiplayer={session.multiplayer} />;
   }
 
-  return (
-    <JoinScreen
-      status={state.status}
-      lobby={state.lobby}
-      onJoin={session.joinLobby}
-      onStartNow={session.startNow}
-    />
-  );
+  return <JoinScreen state={state} onJoin={session.joinLobby} onStartNow={session.startNow} />;
 }
 
 export default App;

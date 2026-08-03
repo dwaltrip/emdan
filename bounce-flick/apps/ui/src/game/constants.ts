@@ -2,7 +2,6 @@ import type { HudSnapshot } from './types';
 
 export {
   BALL_RADIUS,
-  START_X,
   WALL_THICKNESS,
   WORLD_HEIGHT,
   WORLD_WIDTH,

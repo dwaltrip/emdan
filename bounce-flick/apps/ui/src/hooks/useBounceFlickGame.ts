@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { FIXED_STEP } from '../game/constants';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { FIXED_STEP, INITIAL_HUD } from '../game/constants';
 import { bindKeyboardControls, bindPointerControls } from '../game/input';
 import {
   advanceFrame,
@@ -10,66 +10,69 @@ import {
   destroyRuntime,
   eraseRecentInk,
 } from '../game/physics';
-import { renderScene, resizeCanvas } from '../game/renderer';
-import type { GameActions, GeneratedLevel, HudSnapshot } from '../game/types';
+import { renderScene } from '../game/renderer';
+import { createView, resizeCanvas, updateCamera } from '../game/view';
+import type { GeneratedLevel } from '../game/types';
+import type { Multiplayer } from '../net/session';
 
-type NetBridge = {
-  sendBall: (x: number, y: number) => void;
-  getGhostBalls: () => Array<{ x: number; y: number }>;
-  reportFinish: (elapsedMs: number) => void;
+type GameActions = {
+  clearInk: () => void;
+  eraseRecentInk: () => void;
 };
 
 type UseBounceFlickGameParams = {
-  actionsRef: {
-    current: GameActions | null;
-  };
-  canvasRef: {
-    current: HTMLCanvasElement | null;
-  };
   level: GeneratedLevel;
-  levelStartedAt: number;
-  net?: NetBridge;
-  setHud: (snapshot: HudSnapshot) => void;
+  multiplayer?: Multiplayer;
 };
 
-export function useBounceFlickGame({
-  actionsRef,
-  canvasRef,
-  level,
-  levelStartedAt,
-  net,
-  setHud,
-}: UseBounceFlickGameParams) {
+export function useBounceFlickGame({ level, multiplayer }: UseBounceFlickGameParams) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const actionsRef = useRef<GameActions | null>(null);
+  const [hud, setHud] = useState(INITIAL_HUD);
+
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) {
-      return;
-    }
-
-    const context = canvas.getContext('2d');
-    if (!context) {
+    const context = canvas?.getContext('2d');
+    if (!canvas || !context) {
       return;
     }
 
     const runtime = createRuntime(level);
+    const view = createView(level.spawn);
+    let accumulator = 0;
+    let lastFrame = performance.now();
+    let lastHudAt = 0;
+    let rafId = 0;
+    let reportedFinish = false;
 
     const publishHud = (force = false) => {
       const now = performance.now();
-      if (!force && now - runtime.lastHudAt < 90) {
+      if (!force && now - lastHudAt < 90) {
         return;
       }
-
-      runtime.lastHudAt = now;
+      lastHudAt = now;
       setHud(createHudSnapshot(runtime));
     };
 
-    const resize = () => {
-      resizeCanvas(canvas, context, runtime);
+    const pointerControls = bindPointerControls(canvas, runtime, view, publishHud);
+    const actions: GameActions = {
+      clearInk: () => {
+        clearDrawings(runtime);
+        publishHud(true);
+      },
+      eraseRecentInk: () => {
+        pointerControls.cancelActiveStroke();
+        eraseRecentInk(runtime);
+        publishHud(true);
+      },
     };
-
-    let lastFrame = performance.now();
-    let accumulator = 0;
-    let reportedFinish = false;
+    const cleanupKeyboard = bindKeyboardControls(view, {
+      clearDrawings: actions.clearInk,
+      eraseRecentInk: actions.eraseRecentInk,
+    });
+    const cleanupCollisions = bindCollisionHandlers(runtime, () => publishHud(true));
+    const resize = () => resizeCanvas(canvas, context, view);
+    const resizeObserver = new ResizeObserver(resize);
 
     const frame = (now: number) => {
       const delta = Math.min(now - lastFrame, 80);
@@ -83,61 +86,43 @@ export function useBounceFlickGame({
         accumulator -= FIXED_STEP;
       }
 
-      if (net) {
-        runtime.ghostBalls = net.getGhostBalls();
-        net.sendBall(runtime.ball.position.x, runtime.ball.position.y);
+      updateCamera(view, runtime.ball.position, pointerControls.isDrawing());
+      pointerControls.syncAfterCameraMove();
 
+      if (multiplayer) {
+        multiplayer.publishPosition({ x: runtime.ball.position.x, y: runtime.ball.position.y });
         if (runtime.phase === 'cleared' && !reportedFinish) {
           reportedFinish = true;
-          net.reportFinish(performance.now() - levelStartedAt);
+          multiplayer.finish();
         }
       }
 
-      renderScene(context, runtime);
+      renderScene(context, runtime, view, multiplayer?.readPeers());
       publishHud();
-      runtime.rafId = window.requestAnimationFrame(frame);
+      rafId = window.requestAnimationFrame(frame);
     };
-
-    const resizeObserver = new ResizeObserver(resize);
-    const pointerControls = bindPointerControls(canvas, runtime, publishHud);
-    const eraseRecent = () => {
-      pointerControls.cancelActiveStroke();
-      eraseRecentInk(runtime);
-      publishHud(true);
-    };
-    const cleanupKeyboard = bindKeyboardControls(runtime, {
-      clearDrawings: () => {
-        clearDrawings(runtime);
-        publishHud(true);
-      },
-      eraseRecentInk: eraseRecent,
-    });
-    const cleanupCollisions = bindCollisionHandlers(runtime, () => {
-      publishHud(true);
-    });
 
     resizeObserver.observe(canvas);
     resize();
-    actionsRef.current = {
-      clearDrawings: () => {
-        clearDrawings(runtime);
-        publishHud(true);
-      },
-      eraseRecentInk: eraseRecent,
-    };
+    actionsRef.current = actions;
     publishHud(true);
-    runtime.rafId = window.requestAnimationFrame(frame);
+    rafId = window.requestAnimationFrame(frame);
 
     return () => {
-      window.cancelAnimationFrame(runtime.rafId);
+      window.cancelAnimationFrame(rafId);
       resizeObserver.disconnect();
       pointerControls.cleanup();
       cleanupKeyboard();
       cleanupCollisions();
       destroyRuntime(runtime);
-      if (actionsRef.current?.clearDrawings) {
-        actionsRef.current = null;
-      }
+      actionsRef.current = null;
     };
-  }, [actionsRef, canvasRef, level, levelStartedAt, net, setHud]);
+  }, [level, multiplayer]);
+
+  return {
+    canvasRef,
+    clearInk: useCallback(() => actionsRef.current?.clearInk(), []),
+    eraseRecentInk: useCallback(() => actionsRef.current?.eraseRecentInk(), []),
+    hud,
+  };
 }

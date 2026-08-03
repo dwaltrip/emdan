@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { BALL_RADIUS, START_X } from '@shared/game-config';
+import { BALL_RADIUS } from '@shared/game-config';
 import { generateLevel } from '../../src/generate-level';
 import { segmentYAt } from '../../src/geometry';
 import {
@@ -63,8 +63,8 @@ describe('generated levels: ball fits between platforms and corridor', () => {
   it('keeps the finish platform at least the minimum drop below the start platform', () => {
     for (let seed = 1; seed <= SEED_COUNT; seed += 1) {
       const level = generateLevel(seededRandom(seed));
-      const startSurfaceY = segmentYAt(platformTopEdge(startPlatform(level)), START_X);
-      const finishSurfaceY = segmentYAt(platformTopEdge(finishPlatform(level)), level.finishX);
+      const startSurfaceY = segmentYAt(platformTopEdge(startPlatform(level)), level.spawn.x);
+      const finishSurfaceY = segmentYAt(platformTopEdge(finishPlatform(level)), level.goal.x);
 
       expect(startSurfaceY, `seed ${seed}: start surface is missing`).not.toBeNull();
       expect(finishSurfaceY, `seed ${seed}: finish surface is missing`).not.toBeNull();

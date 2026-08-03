@@ -1,4 +1,9 @@
-import { advanceFrame, bindCollisionHandlers, createRuntime } from '../../src/game/physics';
+import {
+  advanceFrame,
+  bindCollisionHandlers,
+  createRuntime,
+  destroyRuntime,
+} from '../../src/game/physics';
 import type { GeneratedLevel, Phase, Runtime } from '../../src/game/types';
 
 export interface SimResult {
@@ -23,21 +28,25 @@ export function simulate(level: GeneratedLevel, options: SimOptions = {}): SimRe
   const { maxSteps = 1200, onReady } = options;
   const runtime = createRuntime(level);
   const unbind = bindCollisionHandlers(runtime, () => {});
-  onReady?.(runtime);
+  try {
+    onReady?.(runtime);
 
-  let steps = 0;
-  for (; steps < maxSteps; steps += 1) {
-    advanceFrame(runtime);
-    if (runtime.phase !== 'running') {
-      break;
+    let steps = 0;
+    for (; steps < maxSteps; steps += 1) {
+      advanceFrame(runtime);
+      if (runtime.phase !== 'running') {
+        break;
+      }
     }
-  }
 
-  unbind();
-  return {
-    phase: runtime.phase,
-    steps,
-    x: runtime.ball.position.x,
-    y: runtime.ball.position.y,
-  };
+    return {
+      phase: runtime.phase,
+      steps,
+      x: runtime.ball.position.x,
+      y: runtime.ball.position.y,
+    };
+  } finally {
+    unbind();
+    destroyRuntime(runtime);
+  }
 }

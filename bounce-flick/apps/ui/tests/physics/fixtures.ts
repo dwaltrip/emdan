@@ -1,77 +1,42 @@
-// Hand-authored levels for the physics scenarios.
+// Hand-authored semantic levels for the physics scenarios.
 
-import type { GeneratedLevel, TerrainSpec } from '../../src/game/types';
+import type { GeneratedLevel, HazardSpec, PlatformSpec, Rect } from '../../src/game/types';
 
-// Render-only style fields (fill/stroke/spikes) are not used, but must be set.
-const STYLE = { fill: 'rgb(0, 0, 0)', stroke: '#000' };
-
-function floor(x: number, y: number, width: number, height: number, angle = 0): TerrainSpec {
-  return {
-    deadly: false,
-    kind: 'object',
-    shape: { type: 'rect', x, y, width, height, angle },
-    style: STYLE,
-  };
+function platform(rect: Rect): PlatformSpec {
+  return { rect, role: 'scattered', skin: 0, type: 'platform' };
 }
 
-function wall(x: number, y: number, width: number, height: number): TerrainSpec {
-  return {
-    deadly: false,
-    kind: 'wall',
-    shape: { type: 'rect', x, y, width, height },
-    style: STYLE,
-  };
+function hazard(rect: Rect): HazardSpec {
+  return { rect, type: 'hazard' };
 }
 
-function spikes(x: number, y: number, width: number, height: number): TerrainSpec {
-  return {
-    deadly: true,
-    kind: 'object',
-    shape: { type: 'rect', x, y, width, height },
-    style: { ...STYLE, spikes: 'up' },
-  };
-}
-
-function finish(x: number, y: number, width: number, height: number): TerrainSpec {
-  return {
-    deadly: false,
-    kind: 'finish',
-    shape: { type: 'rect', x, y, width, height },
-    style: STYLE,
-  };
-}
-
-// Scenario 1: The ball spawns on a gentle downhill slope right before the finish.
-// Expected: rolls down into the finish band -> "cleared"
+// The ball spawns on a gentle downhill slope right before the goal.
 export const slopeToFinish: GeneratedLevel = {
-  finishX: 600,
-  startY: 560,
-  terrain: [floor(500, 660, 1100, 60, 0.1), finish(600, 520, 40, 360)],
+  goal: { x: 600, y: 520, width: 40, height: 360 },
+  pieces: [platform({ x: 500, y: 660, width: 1100, height: 60, angle: 0.1 })],
+  spawn: { x: 140, y: 560 },
 };
 
-// Scenario 2: The ball spawns directly above spikes with walls on both sides.
-// Expected: falls downward landing on spikes -> "crashed"
-export const chuteWithSpikes: GeneratedLevel = {
-  finishX: 4000,
-  startY: 360,
-  terrain: [wall(95, 460, 30, 320), wall(185, 460, 30, 320), spikes(140, 600, 160, 60)],
-};
-
-// Scenario 3: A spike pit between two platforms
-// Player must draw an ink bridge to cross safely.
-// Layout: start platform -> gap with spikes -> landing -> finish.
-// Expected: (1) falls into pit without the bridge and (2) crosses with the bridge.
-export const inkBridgeGap: GeneratedLevel = {
-  finishX: 900,
-  startY: 560,
-  terrain: [
-    floor(120, 640, 320, 60),
-    spikes(460, 780, 360, 60),
-    floor(800, 640, 320, 60),
-    finish(900, 520, 40, 360),
+// The ball spawns directly above a hazard with solid guides on both sides.
+export const chuteWithHazard: GeneratedLevel = {
+  goal: { x: 4000, y: 400, width: 40, height: 360 },
+  pieces: [
+    platform({ x: 95, y: 460, width: 30, height: 320 }),
+    platform({ x: 185, y: 460, width: 30, height: 320 }),
+    hazard({ x: 140, y: 600, width: 160, height: 60 }),
   ],
+  spawn: { x: 140, y: 360 },
 };
 
-// Coordinates for an ink bridge that crosses the gap in Scenario 3.
-// Lines up smoothly with platform. The test doesn't assume the ball can climb a lip.
+// A lethal pit between two platforms. The player must draw an ink bridge.
+export const inkBridgeGap: GeneratedLevel = {
+  goal: { x: 900, y: 520, width: 40, height: 360 },
+  pieces: [
+    platform({ x: 120, y: 640, width: 320, height: 60 }),
+    hazard({ x: 460, y: 780, width: 360, height: 60 }),
+    platform({ x: 800, y: 640, width: 320, height: 60 }),
+  ],
+  spawn: { x: 140, y: 560 },
+};
+
 export const inkBridgeSpan = { from: { x: 270, y: 616 }, to: { x: 650, y: 616 } };

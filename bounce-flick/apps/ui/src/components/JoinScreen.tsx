@@ -1,25 +1,26 @@
-import type { ConnectionStatus, LobbyStatus } from '../net/session';
+import type { JoinState } from '../net/session';
 
 type JoinScreenProps = {
-  status: ConnectionStatus;
-  lobby: LobbyStatus | null;
   onJoin: () => void;
   onStartNow: () => void;
+  state: JoinState;
 };
 
-export function JoinScreen({ status, lobby, onJoin, onStartNow }: JoinScreenProps) {
+export function JoinScreen({ state, onJoin, onStartNow }: JoinScreenProps) {
   return (
     <main className="join-screen">
       <h1>Bounce Flick</h1>
-      {status !== 'connected' ? (
+      {state.phase === 'connecting' ? (
         <p>Connecting…</p>
-      ) : lobby ? (
+      ) : state.phase === 'disconnected' ? (
+        <p>Connection lost.</p>
+      ) : state.phase === 'lobby' ? (
         <>
           <p>
-            {lobby.playersConnected} {lobby.playersConnected === 1 ? 'player' : 'players'} in lobby
+            {state.playersConnected} {state.playersConnected === 1 ? 'player' : 'players'} in lobby
           </p>
-          <button type="button" onClick={onStartNow} disabled={!lobby.ready}>
-            {lobby.ready ? 'Start now' : 'Preparing course…'}
+          <button type="button" onClick={onStartNow} disabled={!state.canStart}>
+            Start now
           </button>
         </>
       ) : (

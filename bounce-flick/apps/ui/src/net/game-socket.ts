@@ -1,9 +1,4 @@
-import {
-  type ClientMessage,
-  type ServerMessage,
-  parseServerMessage,
-  serializeClientMessage,
-} from '@shared/protocol';
+import { type ClientMessage, type ServerMessage } from '@shared/protocol';
 
 interface GameSocketCallbacks {
   onOpen: () => void;
@@ -47,7 +42,7 @@ function createGameSocket(
       return;
     }
 
-    socket.send(serializeClientMessage(message));
+    socket.send(JSON.stringify(message));
   }
 
   function close(): void {
@@ -59,3 +54,13 @@ function createGameSocket(
 
 export type { GameSocketCallbacks, GameSocketHandle };
 export { createGameSocket };
+
+// This client connects to our own server. Untrusted browser commands are
+// validated with Zod on server ingress; malformed server events fail here.
+function parseServerMessage(raw: string): ServerMessage | null {
+  try {
+    return JSON.parse(raw) as ServerMessage;
+  } catch {
+    return null;
+  }
+}

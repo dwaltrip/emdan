@@ -1,11 +1,9 @@
 // Helpers for asserting properties of emitted GeneratedLevel data.
-//
-// These read only the public level schema: terrain pieces identified by kind
-// and shape. Assumes no knowledge of level generator internal types.
 
+import { WALL_THICKNESS } from '@shared/game-config';
+import type { GeneratedLevel, PlatformRole, PlatformSpec, Point, WallSpec } from '@shared/level';
 import { offsetPolylineSegments, segmentSpanX, segmentsYAt } from '../../src/geometry';
 import type { Segment } from '../../src/geometry';
-import type { GeneratedLevel, Point, PolylineShape, RectShape, TerrainSpec } from '@shared/level';
 
 // mulberry32: deterministic [0,1) PRNG, so a seed reproduces a level exactly.
 export function seededRandom(seed: number): () => number {
@@ -22,23 +20,23 @@ export function corridorInnerFaces(level: GeneratedLevel): {
   ceiling: Segment[];
   floor: Segment[];
 } {
-  const walls = level.terrain.filter((piece) => piece.kind === 'wall');
+  const walls = level.pieces.filter((piece): piece is WallSpec => piece.type === 'wall');
   if (walls.length !== 2) {
     throw new Error(`expected 2 corridor walls, found ${walls.length}`);
   }
 
-  const sortedWalls = [...walls].sort((a, b) => meanPolylineY(a) - meanPolylineY(b));
+  const sortedWalls = [...walls].sort((a, b) => meanWallY(a) - meanWallY(b));
   const top = sortedWalls[0]!;
   const bottom = sortedWalls[1]!;
 
   return {
-    ceiling: wallInnerFace(top, 1), // interior is below the top wall
-    floor: wallInnerFace(bottom, -1), // interior is above the bottom wall
+    ceiling: wallInnerFace(top, 1),
+    floor: wallInnerFace(bottom, -1),
   };
 }
 
-export function platformTopEdge(spec: TerrainSpec): Segment {
-  const { x, y, width, height, angle = 0 } = rectOf(spec);
+export function platformTopEdge(spec: PlatformSpec): Segment {
+  const { x, y, width, height, angle = 0 } = spec.rect;
   const cos = Math.cos(angle);
   const sin = Math.sin(angle);
   const corner = (dx: number, dy: number): Point => ({
@@ -59,12 +57,12 @@ export function platformTopEdge(spec: TerrainSpec): Segment {
   return meanY(edgeA) <= meanY(edgeB) ? edgeA : edgeB;
 }
 
-export function startPlatform(level: GeneratedLevel): TerrainSpec {
-  return platformAtIndex(level, level.startPlatformIndex, 'startPlatformIndex');
+export function startPlatform(level: GeneratedLevel): PlatformSpec {
+  return platformWithRole(level, 'start');
 }
 
-export function finishPlatform(level: GeneratedLevel): TerrainSpec {
-  return platformAtIndex(level, level.finishPlatformIndex, 'finishPlatformIndex');
+export function finishPlatform(level: GeneratedLevel): PlatformSpec {
+  return platformWithRole(level, 'finish');
 }
 
 export function minVerticalGapAbove(
@@ -76,7 +74,6 @@ export function minVerticalGapAbove(
   let min: number | null = null;
   for (let step = 0; step <= samples; step += 1) {
     const x = left + ((right - left) * step) / samples;
-    // Lowest-hanging ceiling point binds (largest y = closest to the platform).
     const ceilingY = segmentsYAt(ceiling, x, Math.max);
     if (ceilingY === null) {
       continue;
@@ -90,48 +87,20 @@ export function minVerticalGapAbove(
   return min;
 }
 
-function platformAtIndex(
-  level: GeneratedLevel,
-  index: number | undefined,
-  field: 'finishPlatformIndex' | 'startPlatformIndex',
-): TerrainSpec {
-  if (index === undefined) {
-    throw new Error(`generated level is missing ${field}`);
+function platformWithRole(level: GeneratedLevel, role: PlatformRole): PlatformSpec {
+  const platform = level.pieces.find(
+    (piece): piece is PlatformSpec => piece.type === 'platform' && piece.role === role,
+  );
+  if (!platform) {
+    throw new Error(`generated level is missing its ${role} platform`);
   }
-
-  const platform = level.terrain[index];
-  if (
-    !platform ||
-    platform.kind !== 'object' ||
-    platform.deadly ||
-    platform.shape.type !== 'rect'
-  ) {
-    throw new Error(`${field}=${index} does not point at a platform`);
-  }
-
   return platform;
 }
 
-function wallInnerFace(spec: TerrainSpec, towardInterior: 1 | -1): Segment[] {
-  const { points, thickness } = polylineOf(spec);
-  return offsetPolylineSegments(points, (towardInterior * thickness) / 2);
+function wallInnerFace(spec: WallSpec, towardInterior: 1 | -1): Segment[] {
+  return offsetPolylineSegments(spec.points, (towardInterior * WALL_THICKNESS) / 2);
 }
 
-function meanPolylineY(spec: TerrainSpec) {
-  const { points } = polylineOf(spec);
-  return points.reduce((sum: number, point: Point) => sum + point.y, 0) / points.length;
-}
-
-function polylineOf(spec: TerrainSpec): PolylineShape {
-  if (spec.shape.type !== 'polyline') {
-    throw new Error(`expected a polyline shape, got ${spec.shape.type}`);
-  }
-  return spec.shape;
-}
-
-function rectOf(spec: TerrainSpec): RectShape {
-  if (spec.shape.type !== 'rect') {
-    throw new Error(`expected a rect shape, got ${spec.shape.type}`);
-  }
-  return spec.shape;
+function meanWallY(spec: WallSpec) {
+  return spec.points.reduce((sum, point) => sum + point.y, 0) / spec.points.length;
 }

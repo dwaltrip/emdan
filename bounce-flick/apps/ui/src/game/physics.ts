@@ -12,11 +12,10 @@ import {
   MAX_INK,
   MAX_SPEED,
   MIN_SEGMENT_LENGTH,
-  START_X,
   WORLD_HEIGHT,
   WORLD_WIDTH,
 } from './constants';
-import { clamp, distance } from './math';
+import { clamp, distance } from '@shared/math';
 import { createTerrain } from './terrain';
 import type { GeneratedLevel, HudSnapshot, InkSegment, Phase, Point, Runtime } from './types';
 
@@ -26,8 +25,8 @@ export function createRuntime(level: GeneratedLevel): Runtime {
   engine.positionIterations = 8;
   engine.velocityIterations = 8;
 
-  const terrain = createTerrain(engine, level);
-  const ball = Matter.Bodies.circle(START_X, level.startY, BALL_RADIUS, {
+  const { goal, terrain } = createTerrain(engine, level);
+  const ball = Matter.Bodies.circle(level.spawn.x, level.spawn.y, BALL_RADIUS, {
     density: 0.004,
     friction: 0.04,
     frictionAir: 0.005,
@@ -39,23 +38,14 @@ export function createRuntime(level: GeneratedLevel): Runtime {
 
   return {
     ball,
-    cameraFrozen: false,
-    cameraX: 0,
-    cameraY: clamp(level.startY - 560 * 0.44, 0, WORLD_HEIGHT - 560),
     engine,
-    finishX: level.finishX,
+    goal,
+    goalX: level.goal.x,
     ink: MAX_INK,
     inkSegments: [],
-    lastHudAt: 0,
-    lastPointer: null,
-    ghostBalls: [],
-    pointerScreen: null,
     phase: 'running',
-    pointerId: null,
-    rafId: 0,
+    startX: level.spawn.x,
     terrain,
-    viewportHeight: 560,
-    viewportWidth: 960,
   };
 }
 
@@ -70,7 +60,7 @@ export function createHudSnapshot(runtime: Runtime): HudSnapshot {
     maxInk: MAX_INK,
     phase: runtime.phase,
     progress: clamp(
-      ((runtime.ball.position.x - START_X) / (runtime.finishX - START_X)) * 100,
+      ((runtime.ball.position.x - runtime.startX) / (runtime.goalX - runtime.startX)) * 100,
       0,
       100,
     ),
@@ -104,11 +94,11 @@ function handleCollision(runtime: Runtime, event: Matter.IEventCollision<Matter.
       return;
     }
 
-    if (labels.includes('deadly')) {
+    if (labels.includes('hazard')) {
       didChangePhase = setPhase(runtime, 'crashed') || didChangePhase;
     }
 
-    if (labels.includes('finish')) {
+    if (labels.includes('goal')) {
       didChangePhase = setPhase(runtime, 'cleared') || didChangePhase;
     }
   });
@@ -168,10 +158,6 @@ export function tickPhysics(runtime: Runtime, seconds: number) {
 
   if (runtime.ball.position.y > WORLD_HEIGHT + 150) {
     didChangePhase = setPhase(runtime, 'crashed') || didChangePhase;
-  }
-
-  if (runtime.ball.position.x > runtime.finishX + 120) {
-    didChangePhase = setPhase(runtime, 'cleared') || didChangePhase;
   }
 
   return didChangePhase;

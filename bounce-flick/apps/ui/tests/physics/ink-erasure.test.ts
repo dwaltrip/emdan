@@ -10,9 +10,9 @@ import {
 import type { GeneratedLevel, Runtime } from '../../src/game/types';
 
 const EMPTY_LEVEL: GeneratedLevel = {
-  finishX: 1000,
-  startY: 300,
-  terrain: [],
+  goal: { x: 1000, y: 300, width: 40, height: 100 },
+  pieces: [],
+  spawn: { x: 140, y: 300 },
 };
 
 function withRuntime(test: (runtime: Runtime) => void) {

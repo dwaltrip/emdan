@@ -1,4 +1,5 @@
 import type { Point } from '@shared/level';
+import { distance } from '@shared/math';
 
 export type Segment = {
   from: Point;
@@ -12,15 +13,11 @@ export type YRange = {
 
 const EPSILON = 0.000001;
 
-export function distanceBetween(from: Point, to: Point) {
-  return Math.hypot(to.x - from.x, to.y - from.y);
-}
-
 export function pathLength(path: Point[]) {
   let length = 0;
 
   for (let index = 1; index < path.length; index += 1) {
-    length += distanceBetween(path[index - 1]!, path[index]!);
+    length += distance(path[index - 1]!, path[index]!);
   }
 
   return length;
@@ -80,7 +77,7 @@ export function offsetPolylineSegments(points: Point[], offset: number): Segment
     segments.push(segment);
   });
 
-  return segments.filter((segment) => distanceBetween(segment.from, segment.to) > EPSILON);
+  return segments.filter((segment) => distance(segment.from, segment.to) > EPSILON);
 }
 
 export function segmentSpanX(segment: Segment): { left: number; right: number } {

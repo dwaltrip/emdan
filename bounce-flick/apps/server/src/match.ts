@@ -1,146 +1,115 @@
-import type { BallPosition, MatchWinner, PlayerSeat, ServerMessage } from '@shared/protocol';
+import type {
+  FinishTime,
+  MatchOutcome,
+  MatchWinner,
+  PlayerSeat,
+  ServerMessage,
+} from '@shared/protocol';
+import type { Point } from '@shared/level';
 
-interface MatchOptions {
-  clientIds: Record<PlayerSeat, string>;
-  send: (seat: PlayerSeat, message: ServerMessage) => void;
-  onEnded: () => void;
+export interface MatchPlayer {
+  id: string;
+  seat: PlayerSeat;
+  send: (message: ServerMessage) => void;
 }
 
-// The running game: owns the seat <-> client mapping and forfeit-on-disconnect.
-// Created once the level handshake completes (see GlobalLobby). In-game gameplay
-// relay (per-frame ball updates) is added in a follow-up.
+interface MatchOptions {
+  now?: () => number;
+  onEnded: () => void;
+  players: MatchPlayer[];
+}
+
+type PlayerState = MatchPlayer & {
+  elapsedMs: number | null;
+  position: Point | null;
+};
+
+// A match owns participant state and the one clock shared by every retry of its
+// level. Client-side crashes recreate the game runtime, not this Match.
 export class Match {
-  private readonly clientIds: Record<PlayerSeat, string>;
-  private readonly send: MatchOptions['send'];
-  private readonly onEnded: MatchOptions['onEnded'];
-  private readonly seats: PlayerSeat[];
-  private readonly positions: Record<PlayerSeat, BallPosition | null> = {};
-  private readonly finishTimes: Record<PlayerSeat, number | null> = {};
   private ended = false;
+  private readonly now: () => number;
+  private readonly onEnded: () => void;
+  private readonly players: PlayerState[];
+  private readonly startedAt: number;
 
-  constructor(options: MatchOptions) {
-    this.clientIds = options.clientIds;
-    this.send = options.send;
-    this.onEnded = options.onEnded;
-    this.seats = Object.keys(options.clientIds) as PlayerSeat[];
-    this.seats.forEach((seat) => {
-      this.positions[seat] = null;
-      this.finishTimes[seat] = null;
-    });
-  }
-
-  start(): void {
-    this.seats.forEach((seat) => {
-      this.send(seat, { type: 'start-game' });
-    });
+  constructor({ now = () => performance.now(), onEnded, players }: MatchOptions) {
+    this.now = now;
+    this.onEnded = onEnded;
+    this.players = players.map((player) => ({ ...player, elapsedMs: null, position: null }));
+    this.startedAt = now();
   }
 
   hasClient(clientId: string): boolean {
-    return Object.values(this.clientIds).includes(clientId);
+    return this.players.some((player) => player.id === clientId);
   }
 
-  handleBallUpdate(clientId: string, x: number, y: number): void {
+  handleBallUpdate(clientId: string, position: Point): void {
     if (this.ended) {
       return;
     }
 
-    const seat = this.seatOf(clientId);
-    if (!seat) {
+    const player = this.player(clientId);
+    if (!player) {
       return;
     }
 
-    this.positions[seat] = { x, y };
-    this.broadcast();
+    player.position = position;
+    this.broadcast({
+      type: 'state-update',
+      players: this.players.flatMap(({ position: currentPosition, seat }) =>
+        currentPosition ? [{ position: currentPosition, seat }] : [],
+      ),
+    });
   }
 
-  handleFinished(clientId: string, elapsedMs: number): void {
+  handleFinished(clientId: string): void {
     if (this.ended) {
       return;
     }
 
-    const seat = this.seatOf(clientId);
-    if (!seat || this.finishTimes[seat] !== null) {
+    const player = this.player(clientId);
+    if (!player || player.elapsedMs !== null) {
       return;
     }
 
-    this.finishTimes[seat] = elapsedMs;
-
-    // Wait for every participant to finish, then compare times.
-    if (this.seats.every((playerSeat) => typeof this.finishTimes[playerSeat] === 'number')) {
-      this.finish('finished', this.decideWinner());
+    player.elapsedMs = Math.max(0, this.now() - this.startedAt);
+    const times = this.players.flatMap(({ elapsedMs, seat }) =>
+      elapsedMs === null ? [] : [{ elapsedMs, seat }],
+    );
+    if (times.length === this.players.length) {
+      this.finish({ type: 'finished', times, winner: decideWinner(times) });
     }
   }
 
   handleDisconnect(clientId: string): void {
-    if (this.ended || !this.hasClient(clientId)) {
-      return;
+    if (!this.ended && this.hasClient(clientId)) {
+      this.finish({ type: 'aborted', reason: 'disconnect' });
     }
-
-    this.finish('disconnect', null);
   }
 
-  private finish(reason: 'finished' | 'disconnect', winner: MatchWinner | null): void {
+  private broadcast(message: ServerMessage): void {
+    this.players.forEach((player) => player.send(message));
+  }
+
+  private finish(outcome: MatchOutcome): void {
     if (this.ended) {
       return;
     }
 
     this.ended = true;
-    const message: ServerMessage = {
-      type: 'match-ended',
-      reason,
-      winner,
-      times: this.finishTimes,
-    };
-    this.seats.forEach((seat) => {
-      this.send(seat, message);
-    });
+    this.broadcast({ type: 'match-ended', outcome });
     this.onEnded();
   }
 
-  private decideWinner(): MatchWinner {
-    let winningSeat: PlayerSeat | null = null;
-    let winningTime = Number.POSITIVE_INFINITY;
-    let tied = false;
-
-    this.seats.forEach((seat) => {
-      const time = this.finishTimes[seat];
-      if (time === null || time === undefined) {
-        return;
-      }
-
-      if (time < winningTime) {
-        winningSeat = seat;
-        winningTime = time;
-        tied = false;
-        return;
-      }
-
-      if (time === winningTime) {
-        tied = true;
-      }
-    });
-
-    if (!winningSeat || tied) {
-      return 'draw';
-    }
-
-    return winningSeat;
+  private player(clientId: string): PlayerState | undefined {
+    return this.players.find((player) => player.id === clientId);
   }
+}
 
-  private broadcast(): void {
-    const message: ServerMessage = { type: 'state-update', positions: this.positions };
-    this.seats.forEach((seat) => {
-      this.send(seat, message);
-    });
-  }
+function decideWinner(times: FinishTime[]): MatchWinner {
+  const bestTime = Math.min(...times.map(({ elapsedMs }) => elapsedMs));
+  const winners = times.filter(({ elapsedMs }) => elapsedMs === bestTime);
 
-  private seatOf(clientId: string): PlayerSeat | null {
-    for (const [seat, seatClientId] of Object.entries(this.clientIds)) {
-      if (seatClientId === clientId) {
-        return seat as PlayerSeat;
-      }
-    }
-
-    return null;
-  }
+  return winners.length === 1 ? winners[0]!.seat : 'draw';
 }
