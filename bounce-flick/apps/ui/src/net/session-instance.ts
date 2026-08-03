@@ -1,14 +1,13 @@
-import { createSession } from './session'
+import { createSession } from './session';
 
 const WS_URL =
-  (import.meta.env.VITE_WS_URL as string | undefined) ??
-  `ws://${window.location.hostname}:3002`
+  (import.meta.env.VITE_WS_URL as string | undefined) ?? `ws://${window.location.hostname}:3002`;
 
 // Module-level singleton
-export const session = createSession(WS_URL)
+export const session = createSession(WS_URL);
 
 if (import.meta.hot) {
   import.meta.hot.dispose(() => {
-    session.end()
-  })
+    session.end();
+  });
 }

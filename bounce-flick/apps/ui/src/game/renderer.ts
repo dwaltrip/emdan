@@ -1,63 +1,49 @@
-import type * as Matter from 'matter-js'
-import {
-  BALL_RADIUS,
-  INK_THICKNESS,
-  WORLD_HEIGHT,
-  WORLD_WIDTH,
-} from './constants'
-import { clamp } from './math'
-import { addInkSegment, clampDrawingPoint } from './physics'
-import type {
-  InkSegment,
-  PolylineShape,
-  Runtime,
-  SpikeDirection,
-  TerrainStyle,
-} from './types'
+import type * as Matter from 'matter-js';
+import { BALL_RADIUS, INK_THICKNESS, WORLD_HEIGHT, WORLD_WIDTH } from './constants';
+import { clamp } from './math';
+import { addInkSegment, clampDrawingPoint } from './physics';
+import type { InkSegment, PolylineShape, Runtime, SpikeDirection, TerrainStyle } from './types';
 
 export function resizeCanvas(
   canvas: HTMLCanvasElement,
   context: CanvasRenderingContext2D,
   runtime: Runtime,
 ) {
-  const bounds = canvas.getBoundingClientRect()
-  const dpr = Math.min(window.devicePixelRatio || 1, 2)
-  const width = Math.max(320, bounds.width)
-  const height = Math.max(420, bounds.height)
+  const bounds = canvas.getBoundingClientRect();
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const width = Math.max(320, bounds.width);
+  const height = Math.max(420, bounds.height);
 
-  canvas.width = Math.floor(width * dpr)
-  canvas.height = Math.floor(height * dpr)
-  context.setTransform(dpr, 0, 0, dpr, 0, 0)
-  runtime.viewportWidth = width
-  runtime.viewportHeight = height
+  canvas.width = Math.floor(width * dpr);
+  canvas.height = Math.floor(height * dpr);
+  context.setTransform(dpr, 0, 0, dpr, 0, 0);
+  runtime.viewportWidth = width;
+  runtime.viewportHeight = height;
 }
 
-export function renderScene(
-  context: CanvasRenderingContext2D,
-  runtime: Runtime,
-) {
-  updateCamera(runtime)
-  context.clearRect(0, 0, runtime.viewportWidth, runtime.viewportHeight)
+export function renderScene(context: CanvasRenderingContext2D, runtime: Runtime) {
+  updateCamera(runtime);
+  context.clearRect(0, 0, runtime.viewportWidth, runtime.viewportHeight);
 
-  context.save()
-  context.translate(-runtime.cameraX, -runtime.cameraY)
+  context.save();
+  context.translate(-runtime.cameraX, -runtime.cameraY);
 
-  const viewLeft = runtime.cameraX - 160
-  const viewRight = runtime.cameraX + runtime.viewportWidth + 160
+  const viewLeft = runtime.cameraX - 160;
+  const viewRight = runtime.cameraX + runtime.viewportWidth + 160;
 
   runtime.terrain.forEach((piece) => {
     if (piece.bounds.max.x < viewLeft || piece.bounds.min.x > viewRight) {
-      return
+      return;
     }
 
     if (piece.kind === 'finish') {
-      drawFinishGate(context, piece.bodies[0])
-      return
+      drawFinishGate(context, piece.bodies[0]);
+      return;
     }
 
     if (piece.shape.type === 'polyline') {
-      drawPolyline(context, piece.shape, piece.style)
-      return
+      drawPolyline(context, piece.shape, piece.style);
+      return;
     }
 
     if (piece.style.spikes) {
@@ -67,85 +53,73 @@ export function renderScene(
         piece.style.fill,
         piece.style.stroke,
         piece.style.spikes,
-      )
-      return
+      );
+      return;
     }
 
     piece.bodies.forEach((body) => {
-      drawBody(context, body, piece.style.fill, piece.style.stroke)
-    })
-  })
+      drawBody(context, body, piece.style.fill, piece.style.stroke);
+    });
+  });
 
   runtime.inkSegments.forEach((segment) => {
-    const minX = Math.min(segment.from.x, segment.to.x)
-    const maxX = Math.max(segment.from.x, segment.to.x)
+    const minX = Math.min(segment.from.x, segment.to.x);
+    const maxX = Math.max(segment.from.x, segment.to.x);
     if (maxX >= viewLeft && minX <= viewRight) {
-      drawInkSegment(context, segment)
+      drawInkSegment(context, segment);
     }
-  })
+  });
 
-  drawBall(context, runtime.ball)
+  drawBall(context, runtime.ball);
 
   runtime.ghostBalls.forEach((ghostBall) => {
-    drawGhostBall(context, ghostBall.x, ghostBall.y)
-  })
+    drawGhostBall(context, ghostBall.x, ghostBall.y);
+  });
 
-  context.restore()
+  context.restore();
 
   if (runtime.phase !== 'running') {
-    context.fillStyle = 'rgba(247, 248, 251, 0.28)'
-    context.fillRect(0, 0, runtime.viewportWidth, runtime.viewportHeight)
+    context.fillStyle = 'rgba(247, 248, 251, 0.28)';
+    context.fillRect(0, 0, runtime.viewportWidth, runtime.viewportHeight);
   }
 }
 
 function updateCamera(runtime: Runtime) {
   if (runtime.cameraFrozen) {
-    return
+    return;
   }
 
-  const previousCameraX = runtime.cameraX
-  const previousCameraY = runtime.cameraY
-  const maxCameraX = Math.max(0, WORLD_WIDTH - runtime.viewportWidth)
-  const targetX = clamp(
-    runtime.ball.position.x - runtime.viewportWidth * 0.34,
-    0,
-    maxCameraX,
-  )
-  const maxCameraY = Math.max(0, WORLD_HEIGHT - runtime.viewportHeight)
-  const targetY = clamp(
-    runtime.ball.position.y - runtime.viewportHeight * 0.44,
-    0,
-    maxCameraY,
-  )
+  const previousCameraX = runtime.cameraX;
+  const previousCameraY = runtime.cameraY;
+  const maxCameraX = Math.max(0, WORLD_WIDTH - runtime.viewportWidth);
+  const targetX = clamp(runtime.ball.position.x - runtime.viewportWidth * 0.34, 0, maxCameraX);
+  const maxCameraY = Math.max(0, WORLD_HEIGHT - runtime.viewportHeight);
+  const targetY = clamp(runtime.ball.position.y - runtime.viewportHeight * 0.44, 0, maxCameraY);
 
-  runtime.cameraX += (targetX - runtime.cameraX) * 0.09
+  runtime.cameraX += (targetX - runtime.cameraX) * 0.09;
 
   if (runtime.pointerId === null) {
-    runtime.cameraY += (targetY - runtime.cameraY) * 0.11
+    runtime.cameraY += (targetY - runtime.cameraY) * 0.11;
   }
 
-  dragActivePointer(runtime, previousCameraX, previousCameraY)
+  dragActivePointer(runtime, previousCameraX, previousCameraY);
 }
 
-function dragActivePointer(
-  runtime: Runtime,
-  previousCameraX: number,
-  previousCameraY: number,
-) {
+function dragActivePointer(runtime: Runtime, previousCameraX: number, previousCameraY: number) {
   if (
     runtime.pointerId === null ||
     !runtime.lastPointer ||
     !runtime.pointerScreen ||
     (runtime.cameraX === previousCameraX && runtime.cameraY === previousCameraY)
   ) {
-    return
+    return;
   }
 
   const target = clampDrawingPoint({
     x: runtime.pointerScreen.x + runtime.cameraX,
     y: runtime.pointerScreen.y + runtime.cameraY,
-  })
-  runtime.lastPointer = addInkSegment(runtime, runtime.lastPointer, target)
+  });
+  runtime.lastPointer = addInkSegment(runtime, runtime.lastPointer, target);
 }
 
 function drawBody(
@@ -154,21 +128,21 @@ function drawBody(
   fill: string,
   stroke: string,
 ) {
-  context.beginPath()
+  context.beginPath();
   body.vertices.forEach((vertex, index) => {
     if (index === 0) {
-      context.moveTo(vertex.x, vertex.y)
-      return
+      context.moveTo(vertex.x, vertex.y);
+      return;
     }
 
-    context.lineTo(vertex.x, vertex.y)
-  })
-  context.closePath()
-  context.fillStyle = fill
-  context.fill()
-  context.lineWidth = 2
-  context.strokeStyle = stroke
-  context.stroke()
+    context.lineTo(vertex.x, vertex.y);
+  });
+  context.closePath();
+  context.fillStyle = fill;
+  context.fill();
+  context.lineWidth = 2;
+  context.strokeStyle = stroke;
+  context.stroke();
 }
 
 function drawPolyline(
@@ -177,31 +151,31 @@ function drawPolyline(
   style: TerrainStyle,
 ) {
   if (shape.points.length < 2) {
-    return
+    return;
   }
 
-  context.save()
-  context.lineCap = 'round'
-  context.lineJoin = 'round'
+  context.save();
+  context.lineCap = 'round';
+  context.lineJoin = 'round';
 
-  context.beginPath()
+  context.beginPath();
   shape.points.forEach((point, index) => {
     if (index === 0) {
-      context.moveTo(point.x, point.y)
-      return
+      context.moveTo(point.x, point.y);
+      return;
     }
 
-    context.lineTo(point.x, point.y)
-  })
+    context.lineTo(point.x, point.y);
+  });
 
-  context.lineWidth = shape.thickness + 4
-  context.strokeStyle = style.stroke
-  context.stroke()
+  context.lineWidth = shape.thickness + 4;
+  context.strokeStyle = style.stroke;
+  context.stroke();
 
-  context.lineWidth = shape.thickness
-  context.strokeStyle = style.fill
-  context.stroke()
-  context.restore()
+  context.lineWidth = shape.thickness;
+  context.strokeStyle = style.fill;
+  context.stroke();
+  context.restore();
 }
 
 function drawSpikes(
@@ -211,165 +185,158 @@ function drawSpikes(
   stroke: string,
   direction: SpikeDirection,
 ) {
-  const { min, max } = body.bounds
-  const width = max.x - min.x
-  const height = max.y - min.y
+  const { min, max } = body.bounds;
+  const width = max.x - min.x;
+  const height = max.y - min.y;
 
   if (direction === 'left' || direction === 'right') {
-    const spikes = Math.max(4, Math.floor(height / 26))
-    const spikeHeight = height / spikes
-    const pointsLeft = direction === 'left'
-    const baseX = pointsLeft ? max.x - 4 : min.x + 4
-    const pointX = pointsLeft ? min.x + 2 : max.x - 2
+    const spikes = Math.max(4, Math.floor(height / 26));
+    const spikeHeight = height / spikes;
+    const pointsLeft = direction === 'left';
+    const baseX = pointsLeft ? max.x - 4 : min.x + 4;
+    const pointX = pointsLeft ? min.x + 2 : max.x - 2;
 
-    context.fillStyle = fill
-    context.strokeStyle = stroke
-    context.lineWidth = 2
+    context.fillStyle = fill;
+    context.strokeStyle = stroke;
+    context.lineWidth = 2;
 
     for (let index = 0; index < spikes; index += 1) {
-      const top = min.y + index * spikeHeight
-      context.beginPath()
-      context.moveTo(baseX, top + spikeHeight * 0.08)
-      context.lineTo(pointX, top + spikeHeight * 0.5)
-      context.lineTo(baseX, top + spikeHeight * 0.92)
-      context.closePath()
-      context.fill()
-      context.stroke()
+      const top = min.y + index * spikeHeight;
+      context.beginPath();
+      context.moveTo(baseX, top + spikeHeight * 0.08);
+      context.lineTo(pointX, top + spikeHeight * 0.5);
+      context.lineTo(baseX, top + spikeHeight * 0.92);
+      context.closePath();
+      context.fill();
+      context.stroke();
     }
 
-    return
+    return;
   }
 
-  const spikes = Math.max(4, Math.floor(width / 26))
-  const spikeWidth = width / spikes
-  const pointsUp = direction !== 'down'
-  const baseY = pointsUp ? max.y - 6 : min.y + 6
-  const pointY = pointsUp ? min.y + 2 : max.y - 2
+  const spikes = Math.max(4, Math.floor(width / 26));
+  const spikeWidth = width / spikes;
+  const pointsUp = direction !== 'down';
+  const baseY = pointsUp ? max.y - 6 : min.y + 6;
+  const pointY = pointsUp ? min.y + 2 : max.y - 2;
 
-  context.fillStyle = fill
-  context.strokeStyle = stroke
-  context.lineWidth = 2
+  context.fillStyle = fill;
+  context.strokeStyle = stroke;
+  context.lineWidth = 2;
 
   for (let index = 0; index < spikes; index += 1) {
-    const left = min.x + index * spikeWidth
-    context.beginPath()
-    context.moveTo(left + spikeWidth * 0.08, baseY)
-    context.lineTo(left + spikeWidth * 0.5, pointY)
-    context.lineTo(left + spikeWidth * 0.92, baseY)
-    context.closePath()
-    context.fill()
-    context.stroke()
+    const left = min.x + index * spikeWidth;
+    context.beginPath();
+    context.moveTo(left + spikeWidth * 0.08, baseY);
+    context.lineTo(left + spikeWidth * 0.5, pointY);
+    context.lineTo(left + spikeWidth * 0.92, baseY);
+    context.closePath();
+    context.fill();
+    context.stroke();
   }
 }
 
 function drawFinishGate(context: CanvasRenderingContext2D, body: Matter.Body) {
-  const { min, max } = body.bounds
-  const poleX = (min.x + max.x) / 2
-  const top = min.y - 18
-  const bottom = max.y + 46
-  const flagHeight = 62
-  const flagWidth = 96
+  const { min, max } = body.bounds;
+  const poleX = (min.x + max.x) / 2;
+  const top = min.y - 18;
+  const bottom = max.y + 46;
+  const flagHeight = 62;
+  const flagWidth = 96;
 
-  context.save()
-  context.lineCap = 'round'
-  context.lineWidth = 10
-  context.strokeStyle = '#27393d'
-  context.beginPath()
-  context.moveTo(poleX, top)
-  context.lineTo(poleX, bottom)
-  context.stroke()
+  context.save();
+  context.lineCap = 'round';
+  context.lineWidth = 10;
+  context.strokeStyle = '#27393d';
+  context.beginPath();
+  context.moveTo(poleX, top);
+  context.lineTo(poleX, bottom);
+  context.stroke();
 
-  context.fillStyle = '#f7f8fb'
-  context.strokeStyle = '#27393d'
-  context.lineWidth = 3
-  context.beginPath()
-  context.roundRect(poleX, top + 8, flagWidth, flagHeight, 8)
-  context.fill()
-  context.stroke()
+  context.fillStyle = '#f7f8fb';
+  context.strokeStyle = '#27393d';
+  context.lineWidth = 3;
+  context.beginPath();
+  context.roundRect(poleX, top + 8, flagWidth, flagHeight, 8);
+  context.fill();
+  context.stroke();
 
-  const tile = flagHeight / 3
+  const tile = flagHeight / 3;
   for (let row = 0; row < 3; row += 1) {
     for (let column = 0; column < 4; column += 1) {
       if ((row + column) % 2 === 0) {
-        context.fillStyle = '#27393d'
-        context.fillRect(poleX + column * tile, top + 8 + row * tile, tile, tile)
+        context.fillStyle = '#27393d';
+        context.fillRect(poleX + column * tile, top + 8 + row * tile, tile, tile);
       }
     }
   }
-  context.restore()
+  context.restore();
 }
 
-function drawInkSegment(
-  context: CanvasRenderingContext2D,
-  segment: InkSegment,
-) {
-  context.save()
-  context.lineCap = 'round'
-  context.lineJoin = 'round'
-  context.lineWidth = INK_THICKNESS
-  context.strokeStyle = '#167f90'
-  context.shadowBlur = 10
-  context.shadowColor = 'rgba(22, 127, 144, 0.22)'
-  context.beginPath()
-  context.moveTo(segment.from.x, segment.from.y)
-  context.lineTo(segment.to.x, segment.to.y)
-  context.stroke()
+function drawInkSegment(context: CanvasRenderingContext2D, segment: InkSegment) {
+  context.save();
+  context.lineCap = 'round';
+  context.lineJoin = 'round';
+  context.lineWidth = INK_THICKNESS;
+  context.strokeStyle = '#167f90';
+  context.shadowBlur = 10;
+  context.shadowColor = 'rgba(22, 127, 144, 0.22)';
+  context.beginPath();
+  context.moveTo(segment.from.x, segment.from.y);
+  context.lineTo(segment.to.x, segment.to.y);
+  context.stroke();
 
-  context.shadowBlur = 0
-  context.lineWidth = 3
-  context.strokeStyle = 'rgba(229, 255, 252, 0.78)'
-  context.stroke()
-  context.restore()
+  context.shadowBlur = 0;
+  context.lineWidth = 3;
+  context.strokeStyle = 'rgba(229, 255, 252, 0.78)';
+  context.stroke();
+  context.restore();
 }
 
 function drawBall(context: CanvasRenderingContext2D, ball: Matter.Body) {
-  context.save()
-  context.translate(ball.position.x, ball.position.y)
-  context.rotate(ball.angle)
+  context.save();
+  context.translate(ball.position.x, ball.position.y);
+  context.rotate(ball.angle);
 
-  context.shadowBlur = 18
-  context.shadowColor = 'rgba(39, 57, 61, 0.25)'
-  const gradient = context.createRadialGradient(-7, -9, 2, 0, 0, BALL_RADIUS)
-  gradient.addColorStop(0, '#fff6c7')
-  gradient.addColorStop(0.42, '#f6b949')
-  gradient.addColorStop(1, '#dc563d')
+  context.shadowBlur = 18;
+  context.shadowColor = 'rgba(39, 57, 61, 0.25)';
+  const gradient = context.createRadialGradient(-7, -9, 2, 0, 0, BALL_RADIUS);
+  gradient.addColorStop(0, '#fff6c7');
+  gradient.addColorStop(0.42, '#f6b949');
+  gradient.addColorStop(1, '#dc563d');
 
-  context.fillStyle = gradient
-  context.beginPath()
-  context.arc(0, 0, BALL_RADIUS, 0, Math.PI * 2)
-  context.fill()
+  context.fillStyle = gradient;
+  context.beginPath();
+  context.arc(0, 0, BALL_RADIUS, 0, Math.PI * 2);
+  context.fill();
 
-  context.shadowBlur = 0
-  context.lineWidth = 3
-  context.strokeStyle = '#7f2d24'
-  context.stroke()
+  context.shadowBlur = 0;
+  context.lineWidth = 3;
+  context.strokeStyle = '#7f2d24';
+  context.stroke();
 
-  context.lineWidth = 4
-  context.strokeStyle = 'rgba(127, 45, 36, 0.58)'
-  context.beginPath()
-  context.arc(0, 0, BALL_RADIUS * 0.58, -1.2, 1.2)
-  context.stroke()
-  context.beginPath()
-  context.moveTo(-BALL_RADIUS * 0.8, -3)
-  context.lineTo(BALL_RADIUS * 0.8, 3)
-  context.stroke()
-  context.restore()
+  context.lineWidth = 4;
+  context.strokeStyle = 'rgba(127, 45, 36, 0.58)';
+  context.beginPath();
+  context.arc(0, 0, BALL_RADIUS * 0.58, -1.2, 1.2);
+  context.stroke();
+  context.beginPath();
+  context.moveTo(-BALL_RADIUS * 0.8, -3);
+  context.lineTo(BALL_RADIUS * 0.8, 3);
+  context.stroke();
+  context.restore();
 }
 
-function drawGhostBall(
-  context: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-) {
-  context.save()
-  context.globalAlpha = 0.4
-  context.translate(x, y)
-  context.beginPath()
-  context.arc(0, 0, BALL_RADIUS, 0, Math.PI * 2)
-  context.fillStyle = '#9fb4bb'
-  context.fill()
-  context.lineWidth = 3
-  context.strokeStyle = 'rgba(31, 44, 47, 0.55)'
-  context.stroke()
-  context.restore()
+function drawGhostBall(context: CanvasRenderingContext2D, x: number, y: number) {
+  context.save();
+  context.globalAlpha = 0.4;
+  context.translate(x, y);
+  context.beginPath();
+  context.arc(0, 0, BALL_RADIUS, 0, Math.PI * 2);
+  context.fillStyle = '#9fb4bb';
+  context.fill();
+  context.lineWidth = 3;
+  context.strokeStyle = 'rgba(31, 44, 47, 0.55)';
+  context.stroke();
+  context.restore();
 }

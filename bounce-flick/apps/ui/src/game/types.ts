@@ -1,11 +1,6 @@
-import type * as Matter from 'matter-js'
+import type * as Matter from 'matter-js';
 
-import type {
-  Point,
-  TerrainKind,
-  TerrainShape,
-  TerrainStyle,
-} from '@shared/level'
+import type { Point, TerrainKind, TerrainShape, TerrainStyle } from '@shared/level';
 
 // Re-export shared types for easier use in `apps/ui`
 export type {
@@ -18,55 +13,55 @@ export type {
   TerrainShape,
   TerrainSpec,
   TerrainStyle,
-} from '@shared/level'
+} from '@shared/level';
 
-export type Phase = 'running' | 'cleared' | 'crashed'
+export type Phase = 'running' | 'cleared' | 'crashed';
 
 export type HudSnapshot = {
-  ink: number
-  maxInk: number
-  phase: Phase
-  progress: number
-  speed: number
-}
+  ink: number;
+  maxInk: number;
+  phase: Phase;
+  progress: number;
+  speed: number;
+};
 
 export type InkSegment = {
-  body: Matter.Body
-  from: Point
-  to: Point
-}
+  body: Matter.Body;
+  from: Point;
+  to: Point;
+};
 
 export type TerrainPiece = {
-  bodies: Matter.Body[]
-  bounds: Matter.Bounds
-  deadly: boolean
-  kind: TerrainKind
-  shape: TerrainShape
-  style: TerrainStyle
-}
+  bodies: Matter.Body[];
+  bounds: Matter.Bounds;
+  deadly: boolean;
+  kind: TerrainKind;
+  shape: TerrainShape;
+  style: TerrainStyle;
+};
 
 export type GameActions = {
-  clearDrawings: () => void
-  eraseRecentInk: () => void
-}
+  clearDrawings: () => void;
+  eraseRecentInk: () => void;
+};
 
 export type Runtime = {
-  ball: Matter.Body
-  cameraFrozen: boolean
-  cameraX: number
-  cameraY: number
-  engine: Matter.Engine
-  finishX: number
-  ink: number
-  inkSegments: InkSegment[]
-  lastHudAt: number
-  lastPointer: Point | null
-  ghostBalls: Point[]
-  pointerScreen: Point | null
-  phase: Phase
-  pointerId: number | null
-  rafId: number
-  terrain: TerrainPiece[]
-  viewportHeight: number
-  viewportWidth: number
-}
+  ball: Matter.Body;
+  cameraFrozen: boolean;
+  cameraX: number;
+  cameraY: number;
+  engine: Matter.Engine;
+  finishX: number;
+  ink: number;
+  inkSegments: InkSegment[];
+  lastHudAt: number;
+  lastPointer: Point | null;
+  ghostBalls: Point[];
+  pointerScreen: Point | null;
+  phase: Phase;
+  pointerId: number | null;
+  rafId: number;
+  terrain: TerrainPiece[];
+  viewportHeight: number;
+  viewportWidth: number;
+};

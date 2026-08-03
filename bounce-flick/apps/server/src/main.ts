@@ -1,13 +1,12 @@
-import { WebSocketServer } from 'ws'
+import { WebSocketServer } from 'ws';
 
-import { initServer } from './server'
+import { initServer } from './server';
 
-
-const PORT = Number.parseInt(process.env.PORT ?? '3002', 10)
-const websocketServer = new WebSocketServer({ port: PORT })
+const PORT = Number.parseInt(process.env.PORT ?? '3002', 10);
+const websocketServer = new WebSocketServer({ port: PORT });
 
 websocketServer.on('listening', () => {
-  console.log(`bounce-flick websocket server listening on :${PORT}`)
-})
+  console.log(`bounce-flick websocket server listening on :${PORT}`);
+});
 
-initServer(websocketServer)
+initServer(websocketServer);

@@ -1,4 +1,4 @@
-import * as Matter from 'matter-js'
+import * as Matter from 'matter-js';
 import {
   BALL_RADIUS,
   DRIVE_ACCELERATION,
@@ -15,34 +15,27 @@ import {
   START_X,
   WORLD_HEIGHT,
   WORLD_WIDTH,
-} from './constants'
-import { clamp, distance } from './math'
-import { createTerrain } from './terrain'
-import type {
-  GeneratedLevel,
-  HudSnapshot,
-  InkSegment,
-  Phase,
-  Point,
-  Runtime,
-} from './types'
+} from './constants';
+import { clamp, distance } from './math';
+import { createTerrain } from './terrain';
+import type { GeneratedLevel, HudSnapshot, InkSegment, Phase, Point, Runtime } from './types';
 
 export function createRuntime(level: GeneratedLevel): Runtime {
-  const engine = Matter.Engine.create()
-  engine.gravity.y = GRAVITY
-  engine.positionIterations = 8
-  engine.velocityIterations = 8
+  const engine = Matter.Engine.create();
+  engine.gravity.y = GRAVITY;
+  engine.positionIterations = 8;
+  engine.velocityIterations = 8;
 
-  const terrain = createTerrain(engine, level)
+  const terrain = createTerrain(engine, level);
   const ball = Matter.Bodies.circle(START_X, level.startY, BALL_RADIUS, {
     density: 0.004,
     friction: 0.04,
     frictionAir: 0.005,
     label: 'ball',
     restitution: 0.9,
-  })
+  });
 
-  Matter.Composite.add(engine.world, ball)
+  Matter.Composite.add(engine.world, ball);
 
   return {
     ball,
@@ -63,12 +56,12 @@ export function createRuntime(level: GeneratedLevel): Runtime {
     terrain,
     viewportHeight: 560,
     viewportWidth: 960,
-  }
+  };
 }
 
 export function destroyRuntime(runtime: Runtime) {
-  Matter.Composite.clear(runtime.engine.world, false)
-  Matter.Engine.clear(runtime.engine)
+  Matter.Composite.clear(runtime.engine.world, false);
+  Matter.Engine.clear(runtime.engine);
 }
 
 export function createHudSnapshot(runtime: Runtime): HudSnapshot {
@@ -77,235 +70,209 @@ export function createHudSnapshot(runtime: Runtime): HudSnapshot {
     maxInk: MAX_INK,
     phase: runtime.phase,
     progress: clamp(
-      ((runtime.ball.position.x - START_X) / (runtime.finishX - START_X)) *
-        100,
+      ((runtime.ball.position.x - START_X) / (runtime.finishX - START_X)) * 100,
       0,
       100,
     ),
     speed: Math.hypot(runtime.ball.velocity.x, runtime.ball.velocity.y),
-  }
+  };
 }
 
 function setPhase(runtime: Runtime, phase: Phase) {
   if (runtime.phase === phase) {
-    return false
+    return false;
   }
 
-  runtime.phase = phase
+  runtime.phase = phase;
   if (phase !== 'running') {
     Matter.Body.setVelocity(runtime.ball, {
       x: 0,
       y: runtime.ball.velocity.y,
-    })
-    Matter.Body.setAngularVelocity(runtime.ball, 0)
+    });
+    Matter.Body.setAngularVelocity(runtime.ball, 0);
   }
 
-  return true
+  return true;
 }
 
-function handleCollision(
-  runtime: Runtime,
-  event: Matter.IEventCollision<Matter.Engine>,
-) {
-  let didChangePhase = false
+function handleCollision(runtime: Runtime, event: Matter.IEventCollision<Matter.Engine>) {
+  let didChangePhase = false;
 
   event.pairs.forEach((pair) => {
-    const labels = [pair.bodyA.label, pair.bodyB.label]
+    const labels = [pair.bodyA.label, pair.bodyB.label];
     if (!labels.includes('ball')) {
-      return
+      return;
     }
 
     if (labels.includes('deadly')) {
-      didChangePhase = setPhase(runtime, 'crashed') || didChangePhase
+      didChangePhase = setPhase(runtime, 'crashed') || didChangePhase;
     }
 
     if (labels.includes('finish')) {
-      didChangePhase = setPhase(runtime, 'cleared') || didChangePhase
+      didChangePhase = setPhase(runtime, 'cleared') || didChangePhase;
     }
-  })
+  });
 
-  return didChangePhase
+  return didChangePhase;
 }
 
-export function bindCollisionHandlers(
-  runtime: Runtime,
-  onPhaseChange: () => void,
-) {
+export function bindCollisionHandlers(runtime: Runtime, onPhaseChange: () => void) {
   const collisionHandler = (event: Matter.IEventCollision<Matter.Engine>) => {
     if (handleCollision(runtime, event)) {
-      onPhaseChange()
+      onPhaseChange();
     }
-  }
+  };
 
-  Matter.Events.on(runtime.engine, 'collisionStart', collisionHandler)
+  Matter.Events.on(runtime.engine, 'collisionStart', collisionHandler);
 
   return () => {
-    Matter.Events.off(runtime.engine, 'collisionStart', collisionHandler)
-  }
+    Matter.Events.off(runtime.engine, 'collisionStart', collisionHandler);
+  };
 }
 
 export function stepEngine(runtime: Runtime, stepMs: number) {
   if (runtime.phase === 'running') {
-    Matter.Engine.update(runtime.engine, stepMs)
+    Matter.Engine.update(runtime.engine, stepMs);
   }
 }
 
 export function tickPhysics(runtime: Runtime, seconds: number) {
-  let didChangePhase = false
+  let didChangePhase = false;
 
-  runtime.ink = clamp(
-    runtime.ink + INK_RECHARGE_PER_SECOND * seconds,
-    0,
-    MAX_INK,
-  )
+  runtime.ink = clamp(runtime.ink + INK_RECHARGE_PER_SECOND * seconds, 0, MAX_INK);
 
   if (runtime.phase !== 'running') {
-    return didChangePhase
+    return didChangePhase;
   }
 
   if (runtime.ball.velocity.x < DRIVE_SPEED) {
     Matter.Body.setVelocity(runtime.ball, {
-      x: Math.min(
-        DRIVE_SPEED,
-        runtime.ball.velocity.x + DRIVE_ACCELERATION,
-      ),
+      x: Math.min(DRIVE_SPEED, runtime.ball.velocity.x + DRIVE_ACCELERATION),
       y: runtime.ball.velocity.y,
-    })
+    });
   }
 
   if (runtime.ball.velocity.x > MAX_SPEED) {
     Matter.Body.setVelocity(runtime.ball, {
       x: MAX_SPEED,
       y: runtime.ball.velocity.y,
-    })
+    });
   }
 
   if (runtime.ball.velocity.y > 16) {
     Matter.Body.setVelocity(runtime.ball, {
       x: runtime.ball.velocity.x,
       y: 16,
-    })
+    });
   }
 
   if (runtime.ball.position.y > WORLD_HEIGHT + 150) {
-    didChangePhase = setPhase(runtime, 'crashed') || didChangePhase
+    didChangePhase = setPhase(runtime, 'crashed') || didChangePhase;
   }
 
   if (runtime.ball.position.x > runtime.finishX + 120) {
-    didChangePhase = setPhase(runtime, 'cleared') || didChangePhase
+    didChangePhase = setPhase(runtime, 'cleared') || didChangePhase;
   }
 
-  return didChangePhase
+  return didChangePhase;
 }
 
 // Runs one simulation step. Returns true if `runtime.phase` changed.
 export function advanceFrame(runtime: Runtime, stepMs: number = FIXED_STEP): boolean {
-  const phaseChanged = tickPhysics(runtime, stepMs / 1000)
-  stepEngine(runtime, stepMs)
-  return phaseChanged
+  const phaseChanged = tickPhysics(runtime, stepMs / 1000);
+  stepEngine(runtime, stepMs);
+  return phaseChanged;
 }
 
 export function clampDrawingPoint(point: Point): Point {
   return {
     x: clamp(point.x, 18, WORLD_WIDTH - 18),
     y: clamp(point.y, 80, WORLD_HEIGHT - 22),
-  }
+  };
 }
 
 function createInkBody(from: Point, to: Point) {
-  const length = distance(from, to)
-  const angle = Math.atan2(to.y - from.y, to.x - from.x)
+  const length = distance(from, to);
+  const angle = Math.atan2(to.y - from.y, to.x - from.x);
 
-  return Matter.Bodies.rectangle(
-    (from.x + to.x) / 2,
-    (from.y + to.y) / 2,
-    length,
-    INK_THICKNESS,
-    {
-      angle,
-      chamfer: { radius: INK_THICKNESS / 2 },
-      friction: 0.96,
-      isStatic: true,
-      label: 'ink',
-      restitution: 0.05,
-    },
-  )
+  return Matter.Bodies.rectangle((from.x + to.x) / 2, (from.y + to.y) / 2, length, INK_THICKNESS, {
+    angle,
+    chamfer: { radius: INK_THICKNESS / 2 },
+    friction: 0.96,
+    isStatic: true,
+    label: 'ink',
+    restitution: 0.05,
+  });
 }
 
 export function addInkSegment(runtime: Runtime, from: Point, target: Point) {
-  const fullLength = distance(from, target)
+  const fullLength = distance(from, target);
   if (fullLength < MIN_SEGMENT_LENGTH || runtime.ink <= 0.4) {
-    return from
+    return from;
   }
 
-  const affordableLength = Math.min(
-    fullLength,
-    runtime.ink / INK_COST_PER_PIXEL,
-  )
+  const affordableLength = Math.min(fullLength, runtime.ink / INK_COST_PER_PIXEL);
   if (affordableLength < MIN_SEGMENT_LENGTH) {
-    return from
+    return from;
   }
 
-  const ratio = affordableLength / fullLength
+  const ratio = affordableLength / fullLength;
   const to = {
     x: from.x + (target.x - from.x) * ratio,
     y: from.y + (target.y - from.y) * ratio,
-  }
-  const body = createInkBody(from, to)
-  const segment: InkSegment = { body, from, to }
+  };
+  const body = createInkBody(from, to);
+  const segment: InkSegment = { body, from, to };
 
-  Matter.Composite.add(runtime.engine.world, body)
-  runtime.inkSegments.push(segment)
-  runtime.ink -= affordableLength * INK_COST_PER_PIXEL
+  Matter.Composite.add(runtime.engine.world, body);
+  runtime.inkSegments.push(segment);
+  runtime.ink -= affordableLength * INK_COST_PER_PIXEL;
 
-  return to
+  return to;
 }
 
-export function eraseRecentInk(
-  runtime: Runtime,
-  distanceToErase: number = INK_ERASE_DISTANCE,
-) {
+export function eraseRecentInk(runtime: Runtime, distanceToErase: number = INK_ERASE_DISTANCE) {
   if (!Number.isFinite(distanceToErase) || distanceToErase <= 0) {
-    return 0
+    return 0;
   }
 
-  let erasedDistance = 0
-  let remainingDistance = distanceToErase
+  let erasedDistance = 0;
+  let remainingDistance = distanceToErase;
 
   while (remainingDistance > 0 && runtime.inkSegments.length > 0) {
-    const index = runtime.inkSegments.length - 1
-    const segment = runtime.inkSegments[index]
-    const segmentLength = distance(segment.from, segment.to)
-    const preservedLength = segmentLength - remainingDistance
+    const index = runtime.inkSegments.length - 1;
+    const segment = runtime.inkSegments[index];
+    const segmentLength = distance(segment.from, segment.to);
+    const preservedLength = segmentLength - remainingDistance;
 
     if (preservedLength < MIN_SEGMENT_LENGTH) {
-      Matter.Composite.remove(runtime.engine.world, segment.body)
-      runtime.inkSegments.pop()
-      erasedDistance += segmentLength
-      remainingDistance = Math.max(0, remainingDistance - segmentLength)
-      continue
+      Matter.Composite.remove(runtime.engine.world, segment.body);
+      runtime.inkSegments.pop();
+      erasedDistance += segmentLength;
+      remainingDistance = Math.max(0, remainingDistance - segmentLength);
+      continue;
     }
 
-    const ratio = preservedLength / segmentLength
+    const ratio = preservedLength / segmentLength;
     const to = {
       x: segment.from.x + (segment.to.x - segment.from.x) * ratio,
       y: segment.from.y + (segment.to.y - segment.from.y) * ratio,
-    }
-    const body = createInkBody(segment.from, to)
+    };
+    const body = createInkBody(segment.from, to);
 
-    Matter.Composite.remove(runtime.engine.world, segment.body)
-    Matter.Composite.add(runtime.engine.world, body)
-    runtime.inkSegments[index] = { body, from: segment.from, to }
-    erasedDistance += remainingDistance
-    remainingDistance = 0
+    Matter.Composite.remove(runtime.engine.world, segment.body);
+    Matter.Composite.add(runtime.engine.world, body);
+    runtime.inkSegments[index] = { body, from: segment.from, to };
+    erasedDistance += remainingDistance;
+    remainingDistance = 0;
   }
 
-  return erasedDistance
+  return erasedDistance;
 }
 
 export function clearDrawings(runtime: Runtime) {
   runtime.inkSegments.forEach((segment) => {
-    Matter.Composite.remove(runtime.engine.world, segment.body)
-  })
-  runtime.inkSegments = []
+    Matter.Composite.remove(runtime.engine.world, segment.body);
+  });
+  runtime.inkSegments = [];
 }

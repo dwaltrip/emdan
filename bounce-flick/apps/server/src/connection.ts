@@ -1,6 +1,6 @@
-import type WebSocket from 'ws'
+import type WebSocket from 'ws';
 
 export interface ClientConnection {
-  id: string
-  socket: WebSocket
+  id: string;
+  socket: WebSocket;
 }

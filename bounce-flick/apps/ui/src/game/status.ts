@@ -1,13 +1,13 @@
-import type { Phase } from './types'
+import type { Phase } from './types';
 
 export const getStatusText = (phase: Phase) => {
   if (phase === 'cleared') {
-    return 'Finish reached'
+    return 'Finish reached';
   }
 
   if (phase === 'crashed') {
-    return 'Ball lost'
+    return 'Ball lost';
   }
 
-  return 'Rolling'
-}
+  return 'Rolling';
+};

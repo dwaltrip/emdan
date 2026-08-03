@@ -1,11 +1,11 @@
-import type { RefObject } from 'react'
-import { getStatusText } from '../game/status'
-import type { HudSnapshot } from '../game/types'
+import type { RefObject } from 'react';
+import { getStatusText } from '../game/status';
+import type { HudSnapshot } from '../game/types';
 
 type GameStageProps = {
-  canvasRef: RefObject<HTMLCanvasElement | null>
-  hud: HudSnapshot
-}
+  canvasRef: RefObject<HTMLCanvasElement | null>;
+  hud: HudSnapshot;
+};
 
 export function GameStage({ canvasRef, hud }: GameStageProps) {
   return (
@@ -16,5 +16,5 @@ export function GameStage({ canvasRef, hud }: GameStageProps) {
         <strong>{Math.round(hud.ink)}</strong>
       </div>
     </section>
-  )
+  );
 }

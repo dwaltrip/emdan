@@ -1,19 +1,19 @@
-import './App.css'
-import { Game } from './components/Game'
-import { JoinScreen } from './components/JoinScreen'
-import { ResultScreen } from './components/ResultScreen'
-import { useSession } from './hooks/useSession'
-import { session } from './net/session-instance'
+import './App.css';
+import { Game } from './components/Game';
+import { JoinScreen } from './components/JoinScreen';
+import { ResultScreen } from './components/ResultScreen';
+import { useSession } from './hooks/useSession';
+import { session } from './net/session-instance';
 
 function App() {
-  const state = useSession()
+  const state = useSession();
 
   if (state.result) {
-    return <ResultScreen result={state.result} onPlayAgain={session.joinLobby} />
+    return <ResultScreen result={state.result} onPlayAgain={session.joinLobby} />;
   }
 
   if (state.started && state.level) {
-    return <Game level={state.level} />
+    return <Game level={state.level} />;
   }
 
   return (
@@ -23,7 +23,7 @@ function App() {
       onJoin={session.joinLobby}
       onStartNow={session.startNow}
     />
-  )
+  );
 }
 
-export default App
+export default App;

@@ -3,48 +3,48 @@
 // protocol. Matter-backed runtime types (TerrainPiece, Runtime) stay in the UI.
 
 export type Point = {
-  x: number
-  y: number
-}
+  x: number;
+  y: number;
+};
 
-export type SpikeDirection = 'up' | 'down' | 'left' | 'right'
+export type SpikeDirection = 'up' | 'down' | 'left' | 'right';
 
-export type TerrainKind = 'wall' | 'object' | 'finish'
+export type TerrainKind = 'wall' | 'object' | 'finish';
 
 export type RectShape = {
-  angle?: number
-  height: number
-  type: 'rect'
-  width: number
-  x: number
-  y: number
-}
+  angle?: number;
+  height: number;
+  type: 'rect';
+  width: number;
+  x: number;
+  y: number;
+};
 
 export type PolylineShape = {
-  points: Point[]
-  thickness: number
-  type: 'polyline'
-}
+  points: Point[];
+  thickness: number;
+  type: 'polyline';
+};
 
-export type TerrainShape = PolylineShape | RectShape
+export type TerrainShape = PolylineShape | RectShape;
 
 export type TerrainStyle = {
-  fill: string
-  spikes?: SpikeDirection
-  stroke: string
-}
+  fill: string;
+  spikes?: SpikeDirection;
+  stroke: string;
+};
 
 export type TerrainSpec = {
-  deadly: boolean
-  kind: TerrainKind
-  shape: TerrainShape
-  style: TerrainStyle
-}
+  deadly: boolean;
+  kind: TerrainKind;
+  shape: TerrainShape;
+  style: TerrainStyle;
+};
 
 export type GeneratedLevel = {
-  finishPlatformIndex?: number
-  finishX: number
-  startPlatformIndex?: number
-  startY: number
-  terrain: TerrainSpec[]
-}
+  finishPlatformIndex?: number;
+  finishX: number;
+  startPlatformIndex?: number;
+  startY: number;
+  terrain: TerrainSpec[];
+};

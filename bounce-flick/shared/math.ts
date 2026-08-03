@@ -1,7 +1,6 @@
-import type { Point } from './level'
+import type { Point } from './level';
 
 export const clamp = (value: number, min: number, max: number) =>
-  Math.min(Math.max(value, min), max)
+  Math.min(Math.max(value, min), max);
 
-export const distance = (from: Point, to: Point) =>
-  Math.hypot(to.x - from.x, to.y - from.y)
+export const distance = (from: Point, to: Point) => Math.hypot(to.x - from.x, to.y - from.y);

@@ -1,4 +1,4 @@
-import WebSocket from 'ws'
+import WebSocket from 'ws';
 
 import {
   MAX_PLAYERS,
@@ -8,170 +8,170 @@ import {
   type PlayerSeat,
   type ServerMessage,
   serializeServerMessage,
-} from '@shared/protocol'
+} from '@shared/protocol';
 
-import type { ClientConnection } from './connection'
-import { generateLevel } from './generate-level'
-import { Match } from './match'
+import type { ClientConnection } from './connection';
+import { generateLevel } from './generate-level';
+import { Match } from './match';
 
 // We are in prototype mode: server only runs a single match at a time.
 // GlobalLobby orchestrates this match.
 // The server generates one level per lobby and sends it to every player.
 // Any waiting player can press "Start now" once the level is ready.
 export class GlobalLobby {
-  private readonly clients = new Map<string, ClientConnection>()
-  private readonly waitingPlayers: ClientConnection[] = []
-  private pendingLevel: GeneratedLevel | null = null
-  private readonly levelRecipients = new Set<string>()
-  private activeMatch: Match | null = null
+  private readonly clients = new Map<string, ClientConnection>();
+  private readonly waitingPlayers: ClientConnection[] = [];
+  private pendingLevel: GeneratedLevel | null = null;
+  private readonly levelRecipients = new Set<string>();
+  private activeMatch: Match | null = null;
 
   addConnection(client: ClientConnection): void {
-    this.clients.set(client.id, client)
+    this.clients.set(client.id, client);
   }
 
   removeConnection(clientId: string): void {
-    const client = this.clients.get(clientId)
+    const client = this.clients.get(clientId);
     if (!client) {
-      return
+      return;
     }
 
     if (this.activeMatch?.hasClient(clientId)) {
-      this.activeMatch.handleDisconnect(clientId)
+      this.activeMatch.handleDisconnect(clientId);
     } else {
-      this.removeWaitingClient(clientId)
+      this.removeWaitingClient(clientId);
     }
 
-    this.clients.delete(clientId)
+    this.clients.delete(clientId);
   }
 
   handleClientMessage(clientId: string, message: ClientMessage): void {
-    const client = this.clients.get(clientId)
+    const client = this.clients.get(clientId);
     if (!client) {
-      return
+      return;
     }
 
     switch (message.type) {
       case 'join-lobby':
-        this.joinLobby(client)
-        return
+        this.joinLobby(client);
+        return;
       case 'start-now':
-        this.handleStartNow(client)
-        return
+        this.handleStartNow(client);
+        return;
       case 'ball-update':
         if (this.activeMatch?.hasClient(clientId)) {
-          this.activeMatch.handleBallUpdate(clientId, message.x, message.y)
+          this.activeMatch.handleBallUpdate(clientId, message.x, message.y);
         }
-        return
+        return;
       case 'player-finished':
         if (this.activeMatch?.hasClient(clientId)) {
-          this.activeMatch.handleFinished(clientId, message.elapsedMs)
+          this.activeMatch.handleFinished(clientId, message.elapsedMs);
         }
-        return
+        return;
     }
   }
 
   private joinLobby(client: ClientConnection): void {
     if (this.activeMatch && !this.activeMatch.hasClient(client.id)) {
-      this.sendError(client, 'match-in-progress', ' match already running. Try again later.')
-      return
+      this.sendError(client, 'match-in-progress', ' match already running. Try again later.');
+      return;
     }
 
     if (this.isWaiting(client.id)) {
-      this.broadcastLobbyUpdate()
-      return
+      this.broadcastLobbyUpdate();
+      return;
     }
 
     if (this.waitingPlayers.length >= MAX_PLAYERS) {
-      this.sendError(client, 'lobby-full', 'The lobby is full.')
-      return
+      this.sendError(client, 'lobby-full', 'The lobby is full.');
+      return;
     }
 
-    const seat = seatForIndex(this.waitingPlayers.length)
-    this.waitingPlayers.push(client)
+    const seat = seatForIndex(this.waitingPlayers.length);
+    this.waitingPlayers.push(client);
 
-    this.send(client, { type: 'welcome', seat })
+    this.send(client, { type: 'welcome', seat });
 
     if (!this.pendingLevel) {
-      this.pendingLevel = generateLevel()
+      this.pendingLevel = generateLevel();
     }
 
-    this.maybeSendGameLevel()
-    this.broadcastLobbyUpdate()
+    this.maybeSendGameLevel();
+    this.broadcastLobbyUpdate();
   }
 
   private maybeSendGameLevel(): void {
-    const level = this.pendingLevel
+    const level = this.pendingLevel;
     if (this.activeMatch || !level) {
-      return
+      return;
     }
 
     this.waitingPlayers.forEach((player) => {
       if (this.levelRecipients.has(player.id)) {
-        return
+        return;
       }
 
-      this.send(player, { type: 'game-level', level })
-      this.levelRecipients.add(player.id)
-    })
+      this.send(player, { type: 'game-level', level });
+      this.levelRecipients.add(player.id);
+    });
   }
 
   private handleStartNow(client: ClientConnection): void {
     if (this.activeMatch) {
-      this.sendError(client, 'match-in-progress', 'A match is already running.')
-      return
+      this.sendError(client, 'match-in-progress', 'A match is already running.');
+      return;
     }
 
     if (!this.isWaiting(client.id)) {
-      this.sendError(client, 'not-in-lobby', 'Join the lobby before starting a match.')
-      return
+      this.sendError(client, 'not-in-lobby', 'Join the lobby before starting a match.');
+      return;
     }
 
     if (!this.canStart()) {
-      this.sendError(client, 'level-not-ready', 'The course is still being prepared.')
-      return
+      this.sendError(client, 'level-not-ready', 'The course is still being prepared.');
+      return;
     }
 
-    this.startMatch()
+    this.startMatch();
   }
 
   private startMatch(): void {
     if (!this.canStart()) {
-      return
+      return;
     }
 
-    this.maybeSendGameLevel()
-    const players = [...this.waitingPlayers]
-    this.waitingPlayers.length = 0
-    this.pendingLevel = null
-    this.levelRecipients.clear()
+    this.maybeSendGameLevel();
+    const players = [...this.waitingPlayers];
+    this.waitingPlayers.length = 0;
+    this.pendingLevel = null;
+    this.levelRecipients.clear();
 
-    const bySeat = new Map<PlayerSeat, ClientConnection>()
-    const clientIds: Record<PlayerSeat, string> = {}
+    const bySeat = new Map<PlayerSeat, ClientConnection>();
+    const clientIds: Record<PlayerSeat, string> = {};
 
     players.forEach((player, index) => {
-      const seat = seatForIndex(index)
-      bySeat.set(seat, player)
-      clientIds[seat] = player.id
-    })
+      const seat = seatForIndex(index);
+      bySeat.set(seat, player);
+      clientIds[seat] = player.id;
+    });
 
     this.activeMatch = new Match({
       clientIds,
       send: (seat, message) => {
-        const player = bySeat.get(seat)
+        const player = bySeat.get(seat);
         if (!player) {
-          return
+          return;
         }
 
-        const { socket } = player
+        const { socket } = player;
         if (socket.readyState === WebSocket.OPEN) {
-          socket.send(serializeServerMessage(message))
+          socket.send(serializeServerMessage(message));
         }
       },
       onEnded: () => {
-        this.activeMatch = null
+        this.activeMatch = null;
       },
-    })
-    this.activeMatch.start()
+    });
+    this.activeMatch.start();
   }
 
   private broadcastLobbyUpdate(): void {
@@ -180,10 +180,10 @@ export class GlobalLobby {
       playersConnected: this.waitingPlayers.length,
       requiredPlayers: MIN_PLAYERS,
       ready: this.canStart(),
-    }
+    };
 
     for (const player of this.waitingPlayers) {
-      this.send(player, message)
+      this.send(player, message);
     }
   }
 
@@ -193,15 +193,15 @@ export class GlobalLobby {
   // TODO(dan): Is this how we want it to work? This code will probably get replaced
   // when we have real lobbies and whatnot, so not worth too much effort right now.
   private removeWaitingClient(clientId: string): void {
-    const index = this.waitingPlayers.findIndex((player) => player.id === clientId)
+    const index = this.waitingPlayers.findIndex((player) => player.id === clientId);
     if (index === -1) {
-      return
+      return;
     }
 
-    const partners = this.waitingPlayers.filter((player) => player.id !== clientId)
-    this.waitingPlayers.length = 0
-    this.pendingLevel = null
-    this.levelRecipients.clear()
+    const partners = this.waitingPlayers.filter((player) => player.id !== clientId);
+    this.waitingPlayers.length = 0;
+    this.pendingLevel = null;
+    this.levelRecipients.clear();
 
     for (const partner of partners) {
       this.send(partner, {
@@ -209,29 +209,29 @@ export class GlobalLobby {
         reason: 'disconnect',
         winner: null,
         times: {},
-      })
+      });
     }
   }
 
   private canStart(): boolean {
-    return this.waitingPlayers.length >= MIN_PLAYERS && this.pendingLevel !== null
+    return this.waitingPlayers.length >= MIN_PLAYERS && this.pendingLevel !== null;
   }
 
   private isWaiting(clientId: string): boolean {
-    return this.waitingPlayers.some((player) => player.id === clientId)
+    return this.waitingPlayers.some((player) => player.id === clientId);
   }
 
   private send(client: ClientConnection, message: ServerMessage): void {
     if (client.socket.readyState === WebSocket.OPEN) {
-      client.socket.send(serializeServerMessage(message))
+      client.socket.send(serializeServerMessage(message));
     }
   }
 
   private sendError(client: ClientConnection, code: string, message: string): void {
-    this.send(client, { type: 'error', code, message })
+    this.send(client, { type: 'error', code, message });
   }
 }
 
 function seatForIndex(index: number): PlayerSeat {
-  return `player${index + 1}`
+  return `player${index + 1}`;
 }

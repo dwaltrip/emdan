@@ -1,17 +1,13 @@
-import { getStatusText } from '../game/status'
-import type { HudSnapshot } from '../game/types'
+import { getStatusText } from '../game/status';
+import type { HudSnapshot } from '../game/types';
 
 type GameHeaderProps = {
-  hud: HudSnapshot
-  onClearDrawings: () => void
-  onEraseRecentInk: () => void
-}
+  hud: HudSnapshot;
+  onClearDrawings: () => void;
+  onEraseRecentInk: () => void;
+};
 
-export function GameHeader({
-  hud,
-  onClearDrawings,
-  onEraseRecentInk,
-}: GameHeaderProps) {
+export function GameHeader({ hud, onClearDrawings, onEraseRecentInk }: GameHeaderProps) {
   return (
     <header className="game-topbar">
       <div className="game-title">
@@ -33,7 +29,7 @@ export function GameHeader({
         </button>
       </div>
     </header>
-  )
+  );
 }
 
 function HudPanel({ hud }: { hud: HudSnapshot }) {
@@ -42,10 +38,7 @@ function HudPanel({ hud }: { hud: HudSnapshot }) {
       <div className="ink-readout">
         <span>Ink</span>
         <div className="ink-track" aria-hidden="true">
-          <div
-            className="ink-fill"
-            style={{ width: `${(hud.ink / hud.maxInk) * 100}%` }}
-          />
+          <div className="ink-fill" style={{ width: `${(hud.ink / hud.maxInk) * 100}%` }} />
         </div>
       </div>
       <div className="stat-readout">
@@ -57,5 +50,5 @@ function HudPanel({ hud }: { hud: HudSnapshot }) {
         <strong>{hud.speed.toFixed(1)}</strong>
       </div>
     </div>
-  )
+  );
 }

@@ -1,1 +1,1 @@
-export * from '@shared/math'
+export * from '@shared/math';

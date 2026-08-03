@@ -1,31 +1,25 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { INITIAL_HUD } from '../game/constants'
-import type { GameActions, GeneratedLevel } from '../game/types'
-import { useBounceFlickGame } from '../hooks/useBounceFlickGame'
-import { session } from '../net/session-instance'
-import { GameHeader } from './GameHeader'
-import { GameStage } from './GameStage'
+import { INITIAL_HUD } from '../game/constants';
+import type { GameActions, GeneratedLevel } from '../game/types';
+import { useBounceFlickGame } from '../hooks/useBounceFlickGame';
+import { session } from '../net/session-instance';
+import { GameHeader } from './GameHeader';
+import { GameStage } from './GameStage';
 
-const AUTO_RESTART_DELAY_MS = 600
+const AUTO_RESTART_DELAY_MS = 600;
 
 export function Game({ level }: { level: GeneratedLevel }) {
-  const [runKey, setRunKey] = useState(0)
-  const restart = useCallback(() => setRunKey((key) => key + 1), [])
+  const [runKey, setRunKey] = useState(0);
+  const restart = useCallback(() => setRunKey((key) => key + 1), []);
 
-  return <GameRun key={runKey} level={level} onRestart={restart} />
+  return <GameRun key={runKey} level={level} onRestart={restart} />;
 }
 
-function GameRun({
-  level,
-  onRestart,
-}: {
-  level: GeneratedLevel
-  onRestart: () => void
-}) {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null)
-  const actionsRef = useRef<GameActions | null>(null)
-  const [hud, setHud] = useState(INITIAL_HUD)
+function GameRun({ level, onRestart }: { level: GeneratedLevel; onRestart: () => void }) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const actionsRef = useRef<GameActions | null>(null);
+  const [hud, setHud] = useState(INITIAL_HUD);
 
   // Stable per mount so it doesn't retrigger the game-loop effect.
   // `session.live` is non-React game state, safe to read in the callback.
@@ -37,35 +31,31 @@ function GameRun({
       reportFinish: session.reportFinish,
     }),
     [],
-  )
+  );
 
-  useBounceFlickGame({ actionsRef, canvasRef, level, net, setHud })
+  useBounceFlickGame({ actionsRef, canvasRef, level, net, setHud });
 
   useEffect(() => {
     if (hud.phase !== 'crashed') {
-      return
+      return;
     }
 
-    const timeoutId = window.setTimeout(onRestart, AUTO_RESTART_DELAY_MS)
-    return () => window.clearTimeout(timeoutId)
-  }, [hud.phase, onRestart])
+    const timeoutId = window.setTimeout(onRestart, AUTO_RESTART_DELAY_MS);
+    return () => window.clearTimeout(timeoutId);
+  }, [hud.phase, onRestart]);
 
   const clearDrawings = useCallback(() => {
-    actionsRef.current?.clearDrawings()
-  }, [])
+    actionsRef.current?.clearDrawings();
+  }, []);
 
   const eraseRecentInk = useCallback(() => {
-    actionsRef.current?.eraseRecentInk()
-  }, [])
+    actionsRef.current?.eraseRecentInk();
+  }, []);
 
   return (
     <main className="game-shell">
-      <GameHeader
-        hud={hud}
-        onClearDrawings={clearDrawings}
-        onEraseRecentInk={eraseRecentInk}
-      />
+      <GameHeader hud={hud} onClearDrawings={clearDrawings} onEraseRecentInk={eraseRecentInk} />
       <GameStage canvasRef={canvasRef} hud={hud} />
     </main>
-  )
+  );
 }

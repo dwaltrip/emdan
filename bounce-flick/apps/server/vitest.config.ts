@@ -1,5 +1,5 @@
-import { fileURLToPath, URL } from 'node:url'
-import { defineConfig } from 'vitest/config'
+import { fileURLToPath, URL } from 'node:url';
+import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
@@ -11,4 +11,4 @@ export default defineConfig({
       '@shared': fileURLToPath(new URL('../../shared', import.meta.url)),
     },
   },
-})
+});
